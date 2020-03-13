@@ -1,0 +1,41 @@
+Specification
+ - Application should be able to acquire evidence from Windows (and in Future also Linux machines)
+ - Application must be able to acquire in Windows:
+		- Windows Event Logs in evt and evtx format
+		- dump of memory (should be mable to specify where to )
+		- files described in text files with support of expansions (*,?)
+		- output of commands described in text files  witch exception checking
+		- registry (could be use reg save command)
+		- state of firewall
+		- state of network interfaces
+		- logged on users
+		- running processes
+		- active network connections
+-Application should be able to acquire in Linux:
+        - content of /var/log/directory
+		- files described in text files with support of expansions (*,?)
+		- output of commands described in text files  witch exception checking
+		- state of firewall
+		- state of network interfaces
+		- logged on users
+		- running processes
+		- active network connections
+-Acquired evidence must be stored in local directory (or directory in parameter of program with support of UNC)
+-Application must be able to connect to the Windows machines through  PS-REmoting, WMI, PSExec, RDP (configurable, possible to set to test all )
+-Application should be able to connect to the Linux machines through ssh
+-Application should upload minimal artifacts on target computer
+
+
+Addition by LB:
+...we need to support only the most known firewalls.. iptables, ufw, nftables.
+
+Addition by JG:
+For Linux
+    - Loaded modules
+    - Open files (output of lsof)
+    - Directory of /proc
+
+
+
+
+
