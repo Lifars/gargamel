@@ -1,67 +1,125 @@
 use std::io::Result;
-use std::path::{PathBuf, Path};
-use crate::remote_computer::{RemoteComputerConnector, RemoteComputer};
-use std::fs::File;
-use std::marker::PhantomData;
-use crate::arg_parser::Opts;
+use std::path::{Path, PathBuf};
 use crate::process_runner::{RemoteConnection, run_remote_blocking_and_save};
+use std::fs::File;
+use crate::remote_computer::{RemoteComputer, RemoteComputerConnector};
 
-pub struct EvidenceAcquirer<
-    C: RemoteComputerConnector
-> {
-    pub remote_computer: RemoteComputer,
-    pub store_directory: PathBuf,
-    pub remote_connector: C,
-}
+pub trait EvidenceAcquirer {
 
-impl<
-    C: RemoteComputerConnector
-> EvidenceAcquirer<C> {
-    #[allow(dead_code)]
-    pub fn new(remote_computer: RemoteComputer,
-               store_directory: PathBuf,
-               remote_connector: C,
-    ) -> EvidenceAcquirer<C> {
-        EvidenceAcquirer {
-            remote_computer,
-            store_directory,
-            remote_connector,
+    fn remote_computer(&self) -> &RemoteComputer;
+    fn store_directory(&self) -> &PathBuf;
+    fn remote_connector(&self) -> &dyn RemoteComputerConnector;
+
+    fn _run(
+        &self,
+        command: &[&str],
+        report_filename_prefix: &str
+    ) -> Result<()> {
+        if command.is_empty() {
+            return Ok(());
         }
+        let remote_connection = RemoteConnection::new(
+            self.remote_computer(),
+            self.remote_connector(),
+            &command,
+            self.store_directory(),
+            report_filename_prefix,
+        );
+        info!("Checking {}", report_filename_prefix.replace("_", " "));
+        run_remote_blocking_and_save(
+            remote_connection
+        )
     }
 
-    pub fn from_opts(opts: &Opts,
-                     remote_connector: C,
-    ) -> EvidenceAcquirer<C> {
-        EvidenceAcquirer {
-            remote_computer: RemoteComputer {
-                address: opts.computer.clone(),
-                username: opts.user.clone(),
-                password: opts.password.clone(),
-            },
-            store_directory: PathBuf::from(opts.store_directory.clone()),
-            remote_connector,
-        }
+    fn firewall_state_command(&self) -> Vec<&'static str>;
+    fn firewall_state(&self) -> Result<()> {
+        self._run(
+            &self.firewall_state_command(),
+            "firewall_status",
+        )
     }
-}
 
-pub trait AnyEvidenceAcquirer {
-    fn firewall_state(&self) -> Result<()>;
+    fn network_state_command(&self) -> Vec<&'static str>;
+    fn network_state(&self) -> Result<()> {
+        self._run(
+            &self.network_state_command(),
+            "network_status",
+        )
+    }
 
-    fn network_state(&self) -> Result<()>;
+    fn logged_users_command(&self) -> Vec<&'static str>;
+    fn logged_users(&self) -> Result<()> {
+        self._run(
+            &self.logged_users_command(),
+            "logged_users",
+        )
+    }
 
-    fn logged_users(&self) -> Result<()>;
+    fn running_processes_command(&self) -> Vec<&'static str>;
+    fn running_processes(&self) -> Result<()> {
+        self._run(
+            &self.running_processes_command(),
+            "running_tasks",
+        )
+    }
 
-    fn running_processes(&self) -> Result<()>;
+    fn active_network_connections_command(&self) -> Vec<&'static str>;
+    fn active_network_connections(&self) -> Result<()> {
+        self._run(
+            &self.active_network_connections_command(),
+            "active_network_connections",
+        )
+    }
 
-    fn active_network_connections(&self) -> Result<()>;
+    fn run_commands(&self, command_file: &Path) -> Result<()> {
+        // UNTESTED
+        let file = File::open(command_file)?;
+        let reader = std::io::BufReader::new(file);
+        use std::io::BufRead;
+        for one_command in reader.lines().filter_map(|item| item.ok()) {
+            debug!("Running remote command {}", one_command);
+            let command = one_command.split(' ').collect::<Vec<&str>>();
+            let command_name = command[0];
+            let report_filename_prefix = format!("command_{}", command_name);
+            let remote_connection = RemoteConnection::new(
+                self.remote_computer(),
+                self.remote_connector(),
+                &command,
+                self.store_directory(),
+                &report_filename_prefix,
+            );
+            match run_remote_blocking_and_save(remote_connection) {
+                Ok(_) => {}
+                Err(err) => { error!("{}", err) }
+            };
+        }
+        Ok(())
+    }
 
-    fn run_commands(&self, command_file: &Path) -> Result<()>;
+    #[allow(unused_variables)] // DELETE THIS LINE AFTER IMPLEMENTING THE FUNCTION
+    fn files(&self, file_list: &Path) -> Result<()> {
+        info!("Searching remote files");
+        Ok(())
+    }
 
-    fn files(&self, file_list: &Path) -> Result<()>;
 
-    fn memory_dump(&self) -> Result<()>;
+    fn memory_dump(&self) -> Result<()> {
+        info!("Creating memory dump");
+        Ok(())
+    }
 
-    fn event_logs(&self) -> Result<()>;
+    fn system_event_logs_command(&self) -> Vec<&'static str>;
+    fn application_event_logs_command(&self) -> Vec<&'static str>;
+    fn event_logs(&self) -> Result<()> {
+        self._run(
+            &self.system_event_logs_command(),
+            "events_system",
+        )?;
+        self._run(
+            &self.application_event_logs_command(),
+            "events_application",
+        )
+    }
 
     fn run_all(
         &self,
@@ -123,147 +181,5 @@ pub trait AnyEvidenceAcquirer {
         }
 
         Ok(())
-    }
-}
-
-#[cfg(windows)]
-impl<
-    C: Send + Sync + RemoteComputerConnector
-> AnyEvidenceAcquirer for EvidenceAcquirer<C> {
-    fn firewall_state(&self) -> Result<()> {
-        let remote_connection = RemoteConnection::new(
-            &self.remote_computer,
-            &self.remote_connector,
-            &[
-                "netsh",
-                "advfirewall",
-                "show",
-                "allprofiles",
-                "state",
-            ],
-            &self.store_directory,
-            "firewall_status",
-        );
-        info!("Checking firewall state");
-        run_remote_blocking_and_save(
-            remote_connection
-        )
-    }
-
-    fn network_state(&self) -> Result<()> {
-        let remote_connection = RemoteConnection::new(
-            &self.remote_computer,
-            &self.remote_connector,
-            &["ipconfig", "/all"],
-            &self.store_directory,
-            "network_status",
-        );
-        info!("Checking network state");
-        run_remote_blocking_and_save(
-            remote_connection
-        )
-    }
-
-    fn logged_users(&self) -> Result<()> {
-        let remote_connection = RemoteConnection::new(
-            &self.remote_computer,
-            &self.remote_connector,
-            &["query", "user"],
-            &self.store_directory,
-            "logged_users",
-        );
-        info!("Checking logged users");
-        run_remote_blocking_and_save(
-            remote_connection
-        )
-    }
-
-    fn running_processes(&self) -> Result<()> {
-        let remote_connection = RemoteConnection::new(
-            &self.remote_computer,
-            &self.remote_connector,
-            &["tasklist"],
-            &self.store_directory,
-            "tasks",
-        );
-        info!("Checking running tasks");
-        run_remote_blocking_and_save(
-            remote_connection
-        )
-    }
-
-    fn active_network_connections(&self) -> Result<()> {
-        let remote_connection = RemoteConnection::new(
-            &self.remote_computer,
-            &self.remote_connector,
-            &["netstat", "-ano"],
-            &self.store_directory,
-            "network_connections",
-        );
-        info!("Checking open network connections");
-        run_remote_blocking_and_save(
-            remote_connection
-        )
-    }
-
-    fn run_commands(&self, command_file: &Path) -> Result<()> {
-        let file = File::open(command_file)?;
-        let reader = std::io::BufReader::new(file);
-        use std::io::BufRead;
-        for one_command in reader.lines().filter_map(|item| item.ok()) {
-            debug!("Running remote command {}", one_command);
-            let command = one_command.split(' ').collect::<Vec<&str>>();
-            let command_name = command[0];
-            let report_filename_prefix = format!("command_{}", command_name);
-            let remote_connection = RemoteConnection::new(
-                &self.remote_computer,
-                &self.remote_connector,
-                &command,
-                &self.store_directory,
-                &report_filename_prefix,
-            );
-            match run_remote_blocking_and_save(remote_connection) {
-                Ok(_) => {}
-                Err(err) => { error!("{}", err) }
-            };
-        }
-        Ok(())
-    }
-
-    #[allow(unused_variables)] // DELETE THIS LINE AFTER IMPLEMENTING THE FUNCTION
-    fn files(&self, file_list: &Path) -> Result<()> {
-        info!("Searching remote files");
-        Ok(())
-    }
-
-    fn memory_dump(&self) -> Result<()> {
-        info!("Creating memory dump");
-        Ok(())
-    }
-
-    fn event_logs(&self) -> Result<()> {
-        let remote_connection = RemoteConnection::new(
-            &self.remote_computer,
-            &self.remote_connector,
-            &["wevtutil", "qe", "system"],
-            &self.store_directory,
-            "events_system",
-        );
-        info!("Checking system events");
-        run_remote_blocking_and_save(
-            remote_connection
-        )?;
-
-        let remote_connection = RemoteConnection::new(
-            &self.remote_computer,
-            &self.remote_connector,
-            &["wevtutil", "qe", "application"],
-            &self.store_directory,
-            "events_application",
-        );
-        info!("Checking application events");
-        run_remote_blocking_and_save(
-            remote_connection
-        )
     }
 }

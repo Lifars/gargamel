@@ -1,7 +1,5 @@
 use std::io::Result;
 use crate::process_runner::run_process_blocking;
-use uuid::Uuid;
-use std::ffi::OsStr;
 
 pub struct RemoteComputer {
     pub address: String,
@@ -15,20 +13,6 @@ pub struct PreparedProgramToRun {
 }
 
 pub trait RemoteComputerConnector {
-    // fn connect_and_run_command_with_output(
-    //     &self,
-    //     remote_computer: &RemoteComputer,
-    //     command: Vec<String>,
-    // ) -> Result<BufReader<R>> {
-    //     let prepared = self.prepare_remote_process(remote_computer, command);
-    //     run_process_async_with_output(&prepared.program_path, &prepared.all_program_args)
-    //             .map(|process| process.stdout_reader)
-    //  //       run_process("ipconfig", &["/all"])
-    ////         run_process("ping", &["google.com"])
-    ////         run_process("netstat", &["-ano"])
-    // .map(|process| process.stdout_reader)
-    // }
-
     fn connect_method_name(&self) -> &'static str;
 
     fn connect_and_run_command(
@@ -47,6 +31,33 @@ pub trait RemoteComputerConnector {
         command: Vec<String>,
     ) -> PreparedProgramToRun;
 }
+
+pub struct AsIsConnector {}
+
+impl RemoteComputerConnector for AsIsConnector {
+
+    fn connect_method_name(&self) -> &'static str {
+        return "standard";
+    }
+
+    fn prepare_remote_process(&self,
+                              remote_computer: &RemoteComputer,
+                              command: Vec<String>,
+    ) -> PreparedProgramToRun {
+        let mut all_args: Vec<String> = vec![
+            "/c".to_string(),
+        ];
+        all_args.extend(command);
+
+        debug!("Final command to run on {} is \"{} {:?}\"", remote_computer.address, "cmd.exe", all_args);
+        PreparedProgramToRun {
+            program_path: "cmd.exe".to_string(),
+            all_program_args: all_args,
+        }
+    }
+}
+
+pub static AS_IS_CONNECTOR_INSTANCE: AsIsConnector = AsIsConnector{};
 
 pub struct PsExec {}
 
@@ -74,7 +85,7 @@ impl RemoteComputerConnector for PsExec {
         ];
         all_args.extend(command);
 
-        debug!("Final command to run on {} is \"{} {:?}\"", remote_computer.address, &all_args[0], all_args);
+        debug!("Final command to run on {} is \"{} {:?}\"", remote_computer.address, "cmd.exe", all_args);
         PreparedProgramToRun {
             program_path: "cmd.exe".to_string(),
             all_program_args: all_args,

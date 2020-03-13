@@ -9,17 +9,18 @@ extern crate log;
 extern crate simplelog;
 
 use clap::derive::Clap;
-use crate::evidence_acquirer::{EvidenceAcquirer, AnyEvidenceAcquirer};
+use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::Path;
 use crate::remote_computer::PsExec;
+use crate::standard_tools_evidence_acquirer::StandardToolsEvidenceAcquirer;
 
 mod process_runner;
-mod interactive_process;
 mod evidence_acquirer;
 mod remote_computer;
 mod arg_parser;
 mod logo;
-// mod path_utils;
+mod standard_tools_evidence_acquirer;
+mod wmi_evidence_acquirer;
 
 fn setup_logger() {
     CombinedLogger::init(
@@ -30,7 +31,6 @@ fn setup_logger() {
     ).unwrap();
 }
 
-//
 fn main() -> Result<(), io::Error> {
     setup_logger();
     print_logo();
@@ -51,21 +51,21 @@ fn main() -> Result<(), io::Error> {
     Ok(())
 }
 
-fn create_evidence_acquirers(opts: &Opts) -> Vec<Box<dyn AnyEvidenceAcquirer>> {
-    let acquirers: Vec<Box<dyn AnyEvidenceAcquirer>> = if opts.all {
-        let mut acquirers = Vec::<Box<dyn AnyEvidenceAcquirer>>::new();
+fn create_evidence_acquirers(opts: &Opts) -> Vec<Box<dyn EvidenceAcquirer>> {
+    let acquirers: Vec<Box<dyn EvidenceAcquirer>> = if opts.all {
+        let mut acquirers = Vec::<Box<dyn EvidenceAcquirer>>::new();
         acquirers.push(
-            Box::new(EvidenceAcquirer::from_opts(
+            Box::new(StandardToolsEvidenceAcquirer::from_opts(
                 &opts, PsExec {},
             ))
         );
 
         acquirers
     } else {
-        let mut acquirers = Vec::<Box<dyn AnyEvidenceAcquirer>>::new();
+        let mut acquirers = Vec::<Box<dyn EvidenceAcquirer>>::new();
         if opts.psexec {
             acquirers.push(
-                Box::new(EvidenceAcquirer::from_opts(
+                Box::new(StandardToolsEvidenceAcquirer::from_opts(
                     &opts, PsExec {},
                 ))
             );
