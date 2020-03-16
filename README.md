@@ -18,7 +18,7 @@ cargo build
 ```
 
 Make sure to have the following programs in *Path*
-* `wmic`, should by by default on Windows
+* `wmic`, should be by default on Windows
 * `paexec`, an open source alternative to PsExec, [download here](https://www.poweradmin.com/paexec/)
 
 Run
