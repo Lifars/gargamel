@@ -26,8 +26,8 @@ pub fn create_report_path(
     filename_prefix: &str,
     method_name: &str,
 ) -> Result<PathBuf> {
-    let address_formatted = remote_computer.address.replace(".", "-");
-    let filename = format!("{}-{}_{}_{}.txt",
+    let address_formatted = remote_computer.address.replace(".", "_");
+    let filename = format!("{}_{}_{}_{}.txt",
                            method_name,
                            filename_prefix,
                            address_formatted,

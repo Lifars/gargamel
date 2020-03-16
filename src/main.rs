@@ -27,8 +27,8 @@ mod wmi_evidence_acquirer;
 fn setup_logger() {
     CombinedLogger::init(
         vec![
-            TermLogger::new(LevelFilter::Trace, Config::default(), TerminalMode::Mixed).unwrap(),
-            WriteLogger::new(LevelFilter::Trace, Config::default(), File::create("gargamel.log").unwrap()),
+            TermLogger::new(LevelFilter::Debug, Config::default(), TerminalMode::Mixed).unwrap(),
+            WriteLogger::new(LevelFilter::Debug, Config::default(), File::create("gargamel.log").unwrap()),
         ]
     ).unwrap();
 }
@@ -37,6 +37,7 @@ fn main() -> Result<(), io::Error> {
     setup_logger();
     print_logo();
 
+    // HRAMSA
     // let mut command = Command::new("wmic");
     // let command_args = vec![
     //     "/OUTPUT:C:\\Users\\viliam\\AppData\\Local\\Temp\\wmi4.txt",
@@ -45,28 +46,30 @@ fn main() -> Result<(), io::Error> {
     //     "/PASSWORD:trolko",
     //     "COMPUTERSYSTEM", "GET", "USERNAME"
     // ];
-    let mut command = Command::new("cmd.exe");
-    let p = "C:\\Users\\viliam\\AppData\\Local\\Temp\\wmi8.txt";
-    let p = Path::new(p);
-    {
-        File::create(&p);
-    }
-    let p = dunce::canonicalize(p)?;
-    let p = p.to_str().unwrap().to_string();
-    let p = format!("/OUTPUT:{}", p);
-    let command_args = vec![
-        "/c",
-        "wmic.exe",
-        p.as_str(),
-        "/NODE:192.168.126.142",
-        "/USER:IEUser",
-        "/PASSWORD:trolko",
-        "COMPUTERSYSTEM", "GET", "USERNAME"
-    ];
-    command.args(command_args);
-    let output = command.output()?;
-    println!("{}", String::from_utf8_lossy(&output.stdout));
-    return Ok(());
+
+    // HRAMSA 2
+    // let mut command = Command::new("cmd.exe");
+    // let p = "C:\\Users\\viliam\\AppData\\Local\\Temp\\wmi9.txt";
+    // let p = Path::new(p);
+    // {
+    //     File::create(&p);
+    // }
+    // let p = dunce::canonicalize(p)?;
+    // let p = p.to_str().unwrap().to_string();
+    // let p = format!("/OUTPUT:{}", p);
+    // let command_args = vec![
+    //     "/c",
+    //     "wmic.exe",
+    //     p.as_str(),
+    //     "/NODE:192.168.126.142",
+    //     "/USER:IEUser",
+    //     "/PASSWORD:trolko",
+    //     "COMPUTERSYSTEM", "GET", "USERNAME"
+    // ];
+    // command.args(command_args);
+    // let output = command.output()?;
+    // println!("{}", String::from_utf8_lossy(&output.stdout));
+    // return Ok(());
 
     let opts: Opts = Opts::parse();
     create_dir_all(&opts.store_directory)?;
