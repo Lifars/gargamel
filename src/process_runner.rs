@@ -78,18 +78,13 @@ pub fn run_remote_blocking_and_save(
     {
         File::create(&file_path)?;
     }
-
     let file_path = dunce::canonicalize(file_path)?.to_str().unwrap().to_string();
-
-    let args_with_save: Vec<String> = remote_connection.command.into_iter().chain(vec![
-        ">".to_string(),
-        file_path,
-    ]).collect();
 
     remote_connection.remote_computer_connector
         .connect_and_run_command(
             &remote_connection.remote_computer,
-            args_with_save,
+            file_path,
+            remote_connection.command.clone(),
         )?;
     Ok(())
 }

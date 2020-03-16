@@ -13,6 +13,8 @@ use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::Path;
 use crate::remote_computer::PsExec;
 use crate::standard_tools_evidence_acquirer::StandardToolsEvidenceAcquirer;
+use crate::wmi_evidence_acquirer::WmiEvidenceAcquirer;
+use std::process::Command;
 
 mod process_runner;
 mod evidence_acquirer;
@@ -34,6 +36,38 @@ fn setup_logger() {
 fn main() -> Result<(), io::Error> {
     setup_logger();
     print_logo();
+
+    // let mut command = Command::new("wmic");
+    // let command_args = vec![
+    //     "/OUTPUT:C:\\Users\\viliam\\AppData\\Local\\Temp\\wmi4.txt",
+    //     "/NODE:192.168.126.142",
+    //     "/USER:IEUser",
+    //     "/PASSWORD:trolko",
+    //     "COMPUTERSYSTEM", "GET", "USERNAME"
+    // ];
+    let mut command = Command::new("cmd.exe");
+    let p = "C:\\Users\\viliam\\AppData\\Local\\Temp\\wmi8.txt";
+    let p = Path::new(p);
+    {
+        File::create(&p);
+    }
+    let p = dunce::canonicalize(p)?;
+    let p = p.to_str().unwrap().to_string();
+    let p = format!("/OUTPUT:{}", p);
+    let command_args = vec![
+        "/c",
+        "wmic.exe",
+        p.as_str(),
+        "/NODE:192.168.126.142",
+        "/USER:IEUser",
+        "/PASSWORD:trolko",
+        "COMPUTERSYSTEM", "GET", "USERNAME"
+    ];
+    command.args(command_args);
+    let output = command.output()?;
+    println!("{}", String::from_utf8_lossy(&output.stdout));
+    return Ok(());
+
     let opts: Opts = Opts::parse();
     create_dir_all(&opts.store_directory)?;
     let acquirers = create_evidence_acquirers(&opts);
@@ -59,7 +93,9 @@ fn create_evidence_acquirers(opts: &Opts) -> Vec<Box<dyn EvidenceAcquirer>> {
                 &opts, PsExec {},
             ))
         );
-
+        acquirers.push(
+            Box::new(WmiEvidenceAcquirer::from_opts(&opts))
+        );
         acquirers
     } else {
         let mut acquirers = Vec::<Box<dyn EvidenceAcquirer>>::new();
@@ -68,6 +104,11 @@ fn create_evidence_acquirers(opts: &Opts) -> Vec<Box<dyn EvidenceAcquirer>> {
                 Box::new(StandardToolsEvidenceAcquirer::from_opts(
                     &opts, PsExec {},
                 ))
+            );
+        }
+        if opts.wmi {
+            acquirers.push(
+                Box::new(WmiEvidenceAcquirer::from_opts(&opts))
             );
         }
         acquirers

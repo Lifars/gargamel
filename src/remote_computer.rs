@@ -1,5 +1,6 @@
 use std::io::Result;
 use crate::process_runner::run_process_blocking;
+use std::iter;
 
 pub struct RemoteComputer {
     pub address: String,
@@ -18,80 +19,137 @@ pub trait RemoteComputerConnector {
     fn connect_and_run_command(
         &self,
         remote_computer: &RemoteComputer,
+        output_file_path: String,
         command: Vec<String>,
     ) -> Result<()> {
         debug!("Trying to run command {:?} on {}", command, remote_computer.address);
-        let prepared = self.prepare_remote_process(remote_computer, command);
+        let prepared = self.prepare_remote_process(
+            self.prefix_connector_arguments(remote_computer, output_file_path.clone()),
+            command,
+            self.postfix_connector_arguments(remote_computer, output_file_path)
+        );
         run_process_blocking(&prepared.program_path, &prepared.all_program_args)
     }
 
-    fn prepare_remote_process(
-        &self,
-        remote_computer: &RemoteComputer,
-        command: Vec<String>,
-    ) -> PreparedProgramToRun;
-}
-
-pub struct AsIsConnector {}
-
-impl RemoteComputerConnector for AsIsConnector {
-
-    fn connect_method_name(&self) -> &'static str {
-        return "standard";
-    }
-
     fn prepare_remote_process(&self,
-                              remote_computer: &RemoteComputer,
+                              pre_command: Vec<String>,
                               command: Vec<String>,
+                              post_command: Vec<String>,
     ) -> PreparedProgramToRun {
-        let mut all_args: Vec<String> = vec![
-            "/c".to_string(),
-        ];
-        all_args.extend(command);
-
-        debug!("Final command to run on {} is \"{} {:?}\"", remote_computer.address, "cmd.exe", all_args);
+        let all_args = iter::once("/c".to_string())
+            .chain(pre_command.into_iter())
+            .chain(command.into_iter())
+            .chain(post_command.into_iter())
+            .collect();
         PreparedProgramToRun {
             program_path: "cmd.exe".to_string(),
             all_program_args: all_args,
         }
     }
+
+    fn prefix_connector_arguments(&self,
+                                  remote_computer: &RemoteComputer,
+                                  output_file_path: String,
+    ) -> Vec<String>;
+
+    fn postfix_connector_arguments(&self,
+                                   remote_computer: &RemoteComputer,
+                                   output_file_path: String,
+    ) -> Vec<String>;
 }
 
-pub static AS_IS_CONNECTOR_INSTANCE: AsIsConnector = AsIsConnector{};
+pub struct Local {}
+
+impl RemoteComputerConnector for Local {
+    fn connect_method_name(&self) -> &'static str {
+        return "LOCAL";
+    }
+
+    fn prefix_connector_arguments(&self,
+                                  remote_computer: &RemoteComputer,
+                                  output_file_path: String) -> Vec<String> {
+        vec![]
+    }
+
+    fn postfix_connector_arguments(&self,
+                                   remote_computer: &RemoteComputer,
+                                   output_file_path: String,
+    ) -> Vec<String> {
+        unimplemented!()
+    }
+}
+
+pub static LOCAL_CONNECTOR: Local = Local {};
 
 pub struct PsExec {}
 
 impl RemoteComputerConnector for PsExec {
-
     fn connect_method_name(&self) -> &'static str {
-        return "paexec";
+        return "PAEXEC";
     }
 
-    fn prepare_remote_process(&self,
-                              remote_computer: &RemoteComputer,
-                              command: Vec<String>,
-    ) -> PreparedProgramToRun {
-        let address_for_psexec = format!("\\\\{}", remote_computer.address);
+    fn prefix_connector_arguments(&self,
+                                  remote_computer: &RemoteComputer,
+                                  output_file_path: String,
+    ) -> Vec<String> {
+        let address = format!("\\\\{}", remote_computer.address);
         let program_name = "paexec.exe".to_string();
-        let mut all_args: Vec<String> = vec![
-            "/c".to_string(),
+        vec![
             program_name,
-            address_for_psexec,
+            address,
             "-u".to_string(),
             remote_computer.username.clone(),
             "-p".to_string(),
             remote_computer.password.clone(),
             // "-s".to_string()
-        ];
-        all_args.extend(command);
+        ]
+    }
 
-        debug!("Final command to run on {} is \"{} {:?}\"", remote_computer.address, "cmd.exe", all_args);
-        PreparedProgramToRun {
-            program_path: "cmd.exe".to_string(),
-            all_program_args: all_args,
-        }
+    fn postfix_connector_arguments(&self,
+                                   remote_computer: &RemoteComputer,
+                                   output_file_path: String,
+    ) -> Vec<String> {
+        vec![
+            ">".to_string(),
+            output_file_path
+        ]
     }
 }
+
+pub struct Wmi {}
+
+impl RemoteComputerConnector for Wmi {
+    fn connect_method_name(&self) -> &'static str {
+        return "WMI";
+    }
+
+    fn prefix_connector_arguments(&self,
+                                  remote_computer: &RemoteComputer,
+                                  output_file_path: String,
+    ) -> Vec<String> {
+        let address = format!("/NODE:{}", remote_computer.address);
+        let user = format!("/USER:{}", remote_computer.username);
+        let password = format!("/PASSWORD:{}", remote_computer.password);
+        let output = format!("/OUTPUT:{}", output_file_path);
+        let program_name = "wmic.exe".to_string();
+        vec![
+            program_name,
+            output,
+            address,
+            user,
+            password,
+        ]
+    }
+
+    fn postfix_connector_arguments(&self, remote_computer: &RemoteComputer, output_file_path: String) -> Vec<String> {
+        vec![
+            // ">>".to_string(),
+            // output_file_path
+        ]
+    }
+}
+
+pub static WMI_CONNECTOR: Wmi = Wmi {};
 
 // pub struct Powershell {}
 //

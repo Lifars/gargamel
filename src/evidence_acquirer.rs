@@ -5,7 +5,6 @@ use std::fs::File;
 use crate::remote_computer::{RemoteComputer, RemoteComputerConnector};
 
 pub trait EvidenceAcquirer {
-
     fn remote_computer(&self) -> &RemoteComputer;
     fn store_directory(&self) -> &PathBuf;
     fn remote_connector(&self) -> &dyn RemoteComputerConnector;
@@ -13,7 +12,7 @@ pub trait EvidenceAcquirer {
     fn _run(
         &self,
         command: &[&str],
-        report_filename_prefix: &str
+        report_filename_prefix: &str,
     ) -> Result<()> {
         if command.is_empty() {
             return Ok(());
@@ -25,7 +24,11 @@ pub trait EvidenceAcquirer {
             self.store_directory(),
             report_filename_prefix,
         );
-        info!("Checking {}", report_filename_prefix.replace("_", " "));
+
+        info!("{}: Checking {}",
+              self.remote_connector().connect_method_name(),
+              report_filename_prefix.replace("_", " ")
+        );
         run_remote_blocking_and_save(
             remote_connection
         )
