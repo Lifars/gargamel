@@ -17,6 +17,10 @@ Debug build can be compiled using
 cargo build
 ```
 
+Make sure to have the following programs in *Path*
+* `wmic`, should by by default on Windows
+* `paexec`, an open source alternative to PsExec, [download here](https://www.poweradmin.com/paexec/)
+
 Run
 ---
 Right now, this app works only on Windows and the target computer must use also Windows.
