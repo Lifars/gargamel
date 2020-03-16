@@ -30,7 +30,7 @@ To the Gargamel against the computer with params:
 
 use the command below that will store the results in the newly created directory `testresult`.
 ```bash
-gargamel.exe --c 192.168.126.142 -u IEUser -p trolko -o testresult --all
+gargamel.exe --c 192.168.126.142 -u IEUser -p nbusr123 -o testresult --all
 ```
 
 ###### TODO: Hide the password
@@ -38,3 +38,9 @@ gargamel.exe --c 192.168.126.142 -u IEUser -p trolko -o testresult --all
 Known issues
 ------------
 * WMI cannot write its output to file with symbol `-` in its path/name.
+
+Licensing and Copyright
+-----------------------
+Copyright (C) 2020 LIFARS LLC
+
+All Rights Reserved
