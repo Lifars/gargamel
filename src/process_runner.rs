@@ -1,9 +1,9 @@
 use std::process::Command;
 use std::ops::Not;
-use crate::remote_computer::{RemoteComputerConnector, RemoteComputer};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::io::Result;
+use crate::remote::{RemoteComputer, Connector};
 
 extern crate dunce;
 
@@ -38,7 +38,7 @@ pub fn create_report_path(
 
 pub struct RemoteConnection<'a> {
     pub remote_computer: &'a RemoteComputer,
-    pub remote_computer_connector: &'a dyn RemoteComputerConnector,
+    pub remote_computer_connector: &'a dyn Connector,
     pub command: Vec<String>,
     pub store_directory: &'a Path,
     pub report_filename_prefix: &'a str,
@@ -47,7 +47,7 @@ pub struct RemoteConnection<'a> {
 impl<'a> RemoteConnection<'a> {
     pub fn new(
         remote_computer: &'a RemoteComputer,
-        remote_computer_connector: &'a dyn RemoteComputerConnector,
+        remote_computer_connector: &'a dyn Connector,
         command: &[&'a str],
         store_directory: &'a Path,
         report_filename_prefix: &'a str,

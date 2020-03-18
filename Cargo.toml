@@ -6,7 +6,8 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [profile.release]
-lto = "fat"
+opt-level = 'z'  # Optimize for size. Comment it to optimize for speed
+lto = true
 
 #[build]
 #rustflags = "-C target-cpu=native"

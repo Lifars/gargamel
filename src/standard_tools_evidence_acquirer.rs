@@ -1,13 +1,10 @@
-use crate::remote_computer::{RemoteComputerConnector, RemoteComputer};
-use std::path::{PathBuf, Path};
+use std::path::PathBuf;
 use crate::arg_parser::Opts;
 use crate::evidence_acquirer::EvidenceAcquirer;
-use std::io::Result;
-use crate::process_runner::{RemoteConnection, run_remote_blocking_and_save};
-use std::fs::File;
+use crate::remote::{RemoteComputer, Connector};
 
 pub struct StandardToolsEvidenceAcquirer<
-    C: RemoteComputerConnector
+    C: Connector
 > {
     pub remote_computer: RemoteComputer,
     pub store_directory: PathBuf,
@@ -15,7 +12,7 @@ pub struct StandardToolsEvidenceAcquirer<
 }
 
 impl<
-    C: RemoteComputerConnector
+    C: Connector
 > StandardToolsEvidenceAcquirer<C> {
     #[allow(dead_code)]
     pub fn new(remote_computer: RemoteComputer,
@@ -47,7 +44,7 @@ impl<
 
 #[cfg(windows)]
 impl<
-    C: Send + Sync + RemoteComputerConnector
+    C: Send + Sync + Connector
 > EvidenceAcquirer for StandardToolsEvidenceAcquirer<C> {
     fn remote_computer(&self) -> &RemoteComputer {
         &self.remote_computer
@@ -57,7 +54,7 @@ impl<
         &self.store_directory
     }
 
-    fn remote_connector(&self) -> &dyn RemoteComputerConnector {
+    fn remote_connector(&self) -> &dyn Connector {
         &self.remote_connector
     }
 

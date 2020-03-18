@@ -11,14 +11,13 @@ extern crate simplelog;
 use clap::derive::Clap;
 use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::Path;
-use crate::remote_computer::PsExec;
 use crate::standard_tools_evidence_acquirer::StandardToolsEvidenceAcquirer;
 use crate::wmi_evidence_acquirer::WmiEvidenceAcquirer;
-use std::process::Command;
+use crate::remote::{PsExec, PowerShell, Local};
 
 mod process_runner;
 mod evidence_acquirer;
-mod remote_computer;
+mod remote;
 mod arg_parser;
 mod logo;
 mod standard_tools_evidence_acquirer;
@@ -99,6 +98,11 @@ fn create_evidence_acquirers(opts: &Opts) -> Vec<Box<dyn EvidenceAcquirer>> {
         acquirers.push(
             Box::new(WmiEvidenceAcquirer::from_opts(&opts))
         );
+        acquirers.push(
+            Box::new(StandardToolsEvidenceAcquirer::from_opts(
+                &opts, PowerShell{}
+            ))
+        );
         acquirers
     } else {
         let mut acquirers = Vec::<Box<dyn EvidenceAcquirer>>::new();
@@ -113,6 +117,20 @@ fn create_evidence_acquirers(opts: &Opts) -> Vec<Box<dyn EvidenceAcquirer>> {
             acquirers.push(
                 Box::new(WmiEvidenceAcquirer::from_opts(&opts))
             );
+        }
+        if opts.power_shell {
+            acquirers.push(
+                Box::new(StandardToolsEvidenceAcquirer::from_opts(
+                    &opts, PowerShell{}
+                ))
+            );
+        }
+        if opts.local {
+            acquirers.push(
+                Box::new(StandardToolsEvidenceAcquirer::from_opts(
+                    &opts, Local{}
+                ))
+            )
         }
         acquirers
     };

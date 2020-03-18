@@ -1,10 +1,7 @@
-use std::path::{PathBuf, Path};
+use std::path::PathBuf;
 use crate::arg_parser::Opts;
 use crate::evidence_acquirer::EvidenceAcquirer;
-use std::io::Result;
-use crate::process_runner::{RemoteConnection, run_remote_blocking_and_save};
-use std::fs::File;
-use crate::remote_computer::{RemoteComputer, Local, RemoteComputerConnector, LOCAL_CONNECTOR, WMI_CONNECTOR};
+use crate::remote::{RemoteComputer, WMI_CONNECTOR, Connector};
 
 pub struct WmiEvidenceAcquirer {
     pub remote_computer: RemoteComputer,
@@ -45,11 +42,12 @@ impl EvidenceAcquirer for WmiEvidenceAcquirer {
         &self.store_directory
     }
 
-    fn remote_connector(&self) -> &dyn RemoteComputerConnector {
+    fn remote_connector(&self) -> &dyn Connector {
         &WMI_CONNECTOR
     }
 
     fn firewall_state_command(&self) -> Vec<&'static str> {
+        // Not supported via wmi?
         vec![]
     }
 
@@ -76,18 +74,30 @@ impl EvidenceAcquirer for WmiEvidenceAcquirer {
     }
 
     fn running_processes_command(&self) -> Vec<&'static str> {
-        vec![]
+        vec![
+            "process"
+        ]
     }
 
     fn active_network_connections_command(&self) -> Vec<&'static str> {
-        vec![]
+        vec![
+            "Win32_NetworkConnection"
+        ]
     }
 
     fn system_event_logs_command(&self) -> Vec<&'static str> {
-        vec![]
+        vec![
+            "NTEVENT",
+            "WHERE",
+            "LogFile='system"
+        ]
     }
 
     fn application_event_logs_command(&self) -> Vec<&'static str> {
-        vec![]
+        vec![
+            "NTEVENT",
+            "WHERE",
+            "LogFile='application"
+        ]
     }
 }

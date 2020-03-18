@@ -55,8 +55,10 @@ pub struct Opts {
     pub rdp: bool,
     #[clap(long = "psexec")]
     pub psexec: bool,
-    #[clap(long = "psrem")]
-    pub psremote: bool,
+    #[clap(long = "ps")]
+    pub power_shell: bool,
+    #[clap(long = "local")]
+    pub local: bool,
 
     #[clap(short = "f", long = "fast")]
     pub fast_mode: bool,

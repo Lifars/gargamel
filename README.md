@@ -27,7 +27,7 @@ Right now, this app works only on Windows and the target computer must use also 
 
 Compiled executable is located at `target/release/gargamel.exe`.
 
-To the Gargamel against the computer with params:
+For example, to run the Gargamel against the computer with params:
 * address: *192.168.126.142*
 * username: *IEUser*
 * password: *nbusr123*

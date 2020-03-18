@@ -2,12 +2,12 @@ use std::io::Result;
 use std::path::{Path, PathBuf};
 use crate::process_runner::{RemoteConnection, run_remote_blocking_and_save};
 use std::fs::File;
-use crate::remote_computer::{RemoteComputer, RemoteComputerConnector};
+use crate::remote::{RemoteComputer, Connector};
 
 pub trait EvidenceAcquirer {
     fn remote_computer(&self) -> &RemoteComputer;
     fn store_directory(&self) -> &PathBuf;
-    fn remote_connector(&self) -> &dyn RemoteComputerConnector;
+    fn remote_connector(&self) -> &dyn Connector;
 
     fn _run(
         &self,
