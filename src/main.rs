@@ -73,15 +73,13 @@ fn main() -> Result<(), io::Error> {
     let opts: Opts = Opts::parse();
     create_dir_all(&opts.store_directory)?;
     let acquirers = create_evidence_acquirers(&opts);
+    let mut force_mem_acquire = opts.image_memory;
     for acquirer in acquirers {
-        let result = acquirer.run_all(
+       acquirer.run_all(
             opts.custom_command_path.as_ref().map(|v| Path::new(v)),
             opts.search_files_path.as_ref().map(|v| Path::new(v)),
-            opts.fast_mode,
+            force_mem_acquire
         );
-        if result.is_err() {
-            error!("{}", result.unwrap_err())
-        }
     }
 
     Ok(())

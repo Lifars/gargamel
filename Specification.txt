@@ -2,7 +2,7 @@ Specification
  - Application should be able to acquire evidence from Windows (and in Future also Linux machines)
  - Application must be able to acquire in Windows:
 		- Windows Event Logs in evt and evtx format
-		- dump of memory (should be mable to specify where to )
+		- dump of memory (should be able to specify where to )
 		- files described in text files with support of expansions (*,?)
 		- output of commands described in text files  witch exception checking
 		- registry (could be use reg save command)

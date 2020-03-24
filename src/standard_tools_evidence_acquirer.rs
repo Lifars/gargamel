@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 use crate::arg_parser::Opts;
 use crate::evidence_acquirer::EvidenceAcquirer;
-use crate::remote::{RemoteComputer, Connector};
+use crate::remote::{Computer, Connector, Connection};
 
 pub struct StandardToolsEvidenceAcquirer<
     C: Connector
 > {
-    pub remote_computer: RemoteComputer,
+    pub remote_computer: Computer,
     pub store_directory: PathBuf,
     pub remote_connector: C,
 }
@@ -15,7 +15,7 @@ impl<
     C: Connector
 > StandardToolsEvidenceAcquirer<C> {
     #[allow(dead_code)]
-    pub fn new(remote_computer: RemoteComputer,
+    pub fn new(remote_computer: Computer,
                store_directory: PathBuf,
                remote_connector: C,
     ) -> StandardToolsEvidenceAcquirer<C> {
@@ -30,7 +30,7 @@ impl<
                      remote_connector: C,
     ) -> StandardToolsEvidenceAcquirer<C> {
         StandardToolsEvidenceAcquirer {
-            remote_computer: RemoteComputer {
+            remote_computer: Computer {
                 address: opts.computer.clone(),
                 username: opts.user.clone(),
                 password: opts.password.clone(),
@@ -41,12 +41,43 @@ impl<
     }
 }
 
+#[cfg(windows)]
+impl<
+    C: Send + Sync + Connector
+> StandardToolsEvidenceAcquirer<C> {
+    fn export_registry(
+        &self,
+        root: &str,
+        remote_file_exported: &str,
+    ) {
+        let remote_connection = Connection::new(
+            &self.remote_computer,
+            vec![
+                "reg".to_string(),
+                "export".to_string(),
+                root.to_string(),
+                remote_file_exported.to_string()
+            ],
+            None,
+            "get_registry",
+        );
+
+        info!("{}: Checking registry", self.remote_connector.connect_method_name());
+        match self.remote_connector.connect_and_run_command(
+            remote_connection
+        ) {
+            Ok(_) => {}
+            Err(err) => { error!("Error running command [reg, export]. Cause: {}", err) }
+        }
+    }
+}
+
 
 #[cfg(windows)]
 impl<
     C: Send + Sync + Connector
 > EvidenceAcquirer for StandardToolsEvidenceAcquirer<C> {
-    fn remote_computer(&self) -> &RemoteComputer {
+    fn remote_computer(&self) -> &Computer {
         &self.remote_computer
     }
 
@@ -93,6 +124,34 @@ impl<
             "netstat",
             "-ano"
         ]
+    }
+
+    fn registry(&self) {
+        // self._run(
+        //     &vec!["reg", "export", "HKLM", ""],
+        //     "registry_HKLM",
+        // );
+        // self._run(
+        //     &self.registry_export_command("HKCU"),
+        //     "registry_HKCU",
+        // );
+        // self._run(
+        //     &self.registry_export_command("HKCR"),
+        //     "registry_HKCR",
+        // );
+        // self._run(
+        //     &self.registry_export_command("HKU"),
+        //     "registry_HKU",
+        // );
+        // self._run(
+        //     &self.registry_export_command("HKCC"),
+        //     "registry_HKCC",
+        // )
+        // // Export protected roots?
+    }
+
+    fn memory_dump_command(&self) -> Vec<&'static str> {
+        vec![]
     }
 
 

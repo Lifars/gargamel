@@ -57,10 +57,12 @@ pub struct Opts {
     pub psexec: bool,
     #[clap(long = "ps")]
     pub power_shell: bool,
+    #[clap(long = "ssh")]
+    pub ssh: bool,
     #[clap(long = "local")]
     pub local: bool,
 
-    #[clap(short = "f", long = "fast")]
-    pub fast_mode: bool,
+    #[clap(short = "m", long = "mem-image")]
+    pub image_memory: bool,
 }
 

@@ -1,16 +1,16 @@
 use std::path::PathBuf;
 use crate::arg_parser::Opts;
 use crate::evidence_acquirer::EvidenceAcquirer;
-use crate::remote::{RemoteComputer, WMI_CONNECTOR, Connector};
+use crate::remote::{Computer, WMI_CONNECTOR, Connector};
 
 pub struct WmiEvidenceAcquirer {
-    pub remote_computer: RemoteComputer,
+    pub remote_computer: Computer,
     pub store_directory: PathBuf,
 }
 
 impl WmiEvidenceAcquirer {
     #[allow(dead_code)]
-    pub fn new(remote_computer: RemoteComputer,
+    pub fn new(remote_computer: Computer,
                store_directory: PathBuf,
     ) -> WmiEvidenceAcquirer {
         WmiEvidenceAcquirer {
@@ -21,7 +21,7 @@ impl WmiEvidenceAcquirer {
 
     pub fn from_opts(opts: &Opts) -> WmiEvidenceAcquirer {
         WmiEvidenceAcquirer {
-            remote_computer: RemoteComputer {
+            remote_computer: Computer {
                 address: opts.computer.clone(),
                 username: opts.user.clone(),
                 password: opts.password.clone(),
@@ -34,7 +34,7 @@ impl WmiEvidenceAcquirer {
 
 #[cfg(windows)]
 impl EvidenceAcquirer for WmiEvidenceAcquirer {
-    fn remote_computer(&self) -> &RemoteComputer {
+    fn remote_computer(&self) -> &Computer {
         &self.remote_computer
     }
 
@@ -83,6 +83,14 @@ impl EvidenceAcquirer for WmiEvidenceAcquirer {
         vec![
             "Win32_NetworkConnection"
         ]
+    }
+
+    fn registry(&self) {
+        unimplemented!()
+    }
+
+    fn memory_dump_command(&self) -> Vec<&'static str> {
+        vec![]
     }
 
     fn system_event_logs_command(&self) -> Vec<&'static str> {

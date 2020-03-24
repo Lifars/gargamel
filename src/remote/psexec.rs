@@ -1,4 +1,4 @@
-use crate::remote::{Connector, RemoteComputer};
+use crate::remote::{Connector, Computer};
 
 pub struct PsExec {}
 
@@ -7,7 +7,11 @@ impl Connector for PsExec {
         return "PAEXEC";
     }
 
-        fn prepare_command(&self, remote_computer: &RemoteComputer, command: Vec<String>, output_file_path: String) -> Vec<String> {
+    fn prepare_command(&self,
+                       remote_computer: &Computer,
+                       command: Vec<String>,
+                       output_file_path: Option<String>,
+    ) -> Vec<String> {
         let address = format!("\\\\{}", remote_computer.address);
         let program_name = "paexec.exe".to_string();
         let prefix = vec![
@@ -19,14 +23,16 @@ impl Connector for PsExec {
             remote_computer.password.clone(),
             // "-s".to_string()
         ];
-        let suffix = vec![
-            ">".to_string(),
-            output_file_path
-        ];
-
-        prefix.into_iter()
-            .chain(command.into_iter())
-            .chain(suffix.into_iter())
-            .collect()
+        let almost_result = prefix.into_iter()
+            .chain(command.into_iter());
+        match output_file_path {
+            None => almost_result.collect(),
+            Some(output_file_path) =>
+                almost_result
+                    .chain(vec![
+                        ">".to_string(),
+                        output_file_path
+                    ]).collect()
+        }
     }
 }
