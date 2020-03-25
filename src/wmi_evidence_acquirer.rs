@@ -89,10 +89,6 @@ impl EvidenceAcquirer for WmiEvidenceAcquirer {
         unimplemented!()
     }
 
-    fn memory_dump_command(&self) -> Vec<&'static str> {
-        vec![]
-    }
-
     fn system_event_logs_command(&self) -> Vec<&'static str> {
         vec![
             "NTEVENT",

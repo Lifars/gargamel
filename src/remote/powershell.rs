@@ -4,7 +4,7 @@ pub struct PowerShell {}
 
 impl Connector for PowerShell {
     fn connect_method_name(&self) -> &'static str {
-        return "PS";
+        return "PSREM";
     }
 
     fn prepare_command(&self,

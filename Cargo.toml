@@ -15,10 +15,11 @@ lto = true
 [dependencies]
 #tokio = { version = "0.2", features=["full"] }
 #futures = "0.3"
+#async-trait = "0.1"
 log = "0.4"
 simplelog = "0.7"
 clap = { git = "https://github.com/clap-rs/clap/" }
-async-trait = "0.1"
 bytes = ""
 uuid = { version = "0.8", features = ["v4"] }
 dunce = "1.0.0"
+wait-timeout = "0.2.0"

@@ -55,14 +55,18 @@ pub struct Opts {
     pub rdp: bool,
     #[clap(long = "psexec")]
     pub psexec: bool,
-    #[clap(long = "ps")]
-    pub power_shell: bool,
+    #[clap(long = "psrem")]
+    pub psrem: bool,
     #[clap(long = "ssh")]
     pub ssh: bool,
     #[clap(long = "local")]
     pub local: bool,
 
-    #[clap(short = "m", long = "mem-image")]
-    pub image_memory: bool,
+    #[clap(
+    short = "m",
+    long = "mem-image",
+    help = "Optional: Memory dump name"
+    )]
+    pub image_memory: Option<String>,
 }
 

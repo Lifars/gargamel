@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use std::fs::File;
 use crate::remote::{Computer, Connector, Connection};
 use std::ffi::OsStr;
+use crate::command_utils::parse_command;
+use std::ops::Deref;
 
 pub trait EvidenceAcquirer {
     fn remote_computer(&self) -> &Computer;
@@ -38,40 +40,40 @@ pub trait EvidenceAcquirer {
     fn firewall_state_command(&self) -> Vec<&'static str>;
     fn firewall_state(&self) {
         self._run(
-             &self.firewall_state_command(),
-             "firewall_status",
+            &self.firewall_state_command(),
+            "firewall_status",
         )
     }
 
     fn network_state_command(&self) -> Vec<&'static str>;
     fn network_state(&self) {
         self._run(
-             &self.network_state_command(),
-             "network_status",
+            &self.network_state_command(),
+            "network_status",
         )
     }
 
     fn logged_users_command(&self) -> Vec<&'static str>;
     fn logged_users(&self) {
         self._run(
-             &self.logged_users_command(),
-             "logged_users",
+            &self.logged_users_command(),
+            "logged_users",
         )
     }
 
     fn running_processes_command(&self) -> Vec<&'static str>;
     fn running_processes(&self) {
         self._run(
-             &self.running_processes_command(),
-             "running_tasks",
+            &self.running_processes_command(),
+            "running_tasks",
         )
     }
 
     fn active_network_connections_command(&self) -> Vec<&'static str>;
     fn active_network_connections(&self) {
         self._run(
-             &self.active_network_connections_command(),
-             "active_network_connections",
+            &self.active_network_connections_command(),
+            "active_network_connections",
         )
     }
 
@@ -82,18 +84,46 @@ pub trait EvidenceAcquirer {
             Err(err) => {
                 error!("{}", err);
                 return;
-            },
+            }
         };
         let reader = std::io::BufReader::new(file);
         use std::io::BufRead;
         for one_command in reader.lines().filter_map(|item| item.ok()) {
+            if one_command.starts_with("#") {
+                continue;
+            }
+            if one_command.is_empty() {
+                continue;
+            }
             debug!("Running remote command {}", one_command);
-            let command = one_command
-                .split(' ')
-                .map(|it| it.to_string())
-                .collect::<Vec<String>>();
-            let command_name = &command[0];
-            let report_filename_prefix = format!("command_{}", command_name);
+            let command = parse_command(&one_command);
+
+            let first_arg = command[0].to_ascii_lowercase();
+            let command = if first_arg.starts_with(":") {
+                let method_name = self.remote_connector().connect_method_name().to_ascii_lowercase();
+                if first_arg.contains(&method_name) {
+                    command[1..].to_vec()
+                } else {
+                    continue;
+                }
+            } else {
+                command
+            };
+
+            let command_joined: String = command.join("-");
+            let command_joined = if command_joined.len() > 100 {
+                command_joined[..100].to_string()
+            } else {
+                command_joined
+            };
+            let command_joined = command_joined
+                .replace(" ", "-")
+                .replace("\"", "")
+                .replace("/", "")
+                .replace("\\", "")
+                .replace(":", "-");
+            let report_filename_prefix = format!("custom_{}", command_joined);
+
             let remote_connection = Connection::new(
                 self.remote_computer(),
                 command,
@@ -115,21 +145,21 @@ pub trait EvidenceAcquirer {
         info!("Searching remote files");
     }
 
-    fn memory_dump_command(&self) -> Vec<&'static str>;
-    fn memory_dump(&self) {
-        info!("Creating memory dump");
-    }
+    // fn memory_dump_command(&self) -> Vec<&'static str>;
+    // fn memory_dump(&self) {
+    //     info!("Creating memory dump");
+    // }
 
     fn system_event_logs_command(&self) -> Vec<&'static str>;
     fn application_event_logs_command(&self) -> Vec<&'static str>;
     fn event_logs(&self) {
         self._run(
-             &self.system_event_logs_command(),
-             "events_system",
+            &self.system_event_logs_command(),
+            "events_system",
         );
         self._run(
-             &self.application_event_logs_command(),
-             "events_application",
+            &self.application_event_logs_command(),
+            "events_application",
         );
     }
 
@@ -137,7 +167,7 @@ pub trait EvidenceAcquirer {
         &self,
         command_file: Option<&Path>,
         file_list: Option<&Path>,
-        memory_acquire: bool,
+        // memory_acquire: bool,
     ) {
         self.firewall_state();
         self.network_state();
@@ -151,8 +181,8 @@ pub trait EvidenceAcquirer {
         if file_list.is_some() {
             self.files(file_list.unwrap());
         }
-        if memory_acquire {
-            self.memory_dump();
-        }
+        // if memory_acquire {
+        //     self.memory_dump();
+        // }
     }
 }

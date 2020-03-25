@@ -2,23 +2,20 @@ use std::path::PathBuf;
 use crate::arg_parser::Opts;
 use crate::evidence_acquirer::EvidenceAcquirer;
 use crate::remote::{Computer, Connector, Connection};
+use std::ops::Deref;
 
-pub struct StandardToolsEvidenceAcquirer<
-    C: Connector
-> {
+pub struct StandardToolsEvidenceAcquirer {
     pub remote_computer: Computer,
     pub store_directory: PathBuf,
-    pub remote_connector: C,
+    pub remote_connector: Box<dyn Connector>,
 }
 
-impl<
-    C: Connector
-> StandardToolsEvidenceAcquirer<C> {
+impl StandardToolsEvidenceAcquirer {
     #[allow(dead_code)]
     pub fn new(remote_computer: Computer,
                store_directory: PathBuf,
-               remote_connector: C,
-    ) -> StandardToolsEvidenceAcquirer<C> {
+               remote_connector: Box<dyn Connector>,
+    ) -> StandardToolsEvidenceAcquirer {
         StandardToolsEvidenceAcquirer {
             remote_computer,
             store_directory,
@@ -27,8 +24,8 @@ impl<
     }
 
     pub fn from_opts(opts: &Opts,
-                     remote_connector: C,
-    ) -> StandardToolsEvidenceAcquirer<C> {
+                     remote_connector: Box<dyn Connector>,
+    ) -> StandardToolsEvidenceAcquirer {
         StandardToolsEvidenceAcquirer {
             remote_computer: Computer {
                 address: opts.computer.clone(),
@@ -42,9 +39,7 @@ impl<
 }
 
 #[cfg(windows)]
-impl<
-    C: Send + Sync + Connector
-> StandardToolsEvidenceAcquirer<C> {
+impl StandardToolsEvidenceAcquirer {
     fn export_registry(
         &self,
         root: &str,
@@ -74,9 +69,7 @@ impl<
 
 
 #[cfg(windows)]
-impl<
-    C: Send + Sync + Connector
-> EvidenceAcquirer for StandardToolsEvidenceAcquirer<C> {
+impl EvidenceAcquirer for StandardToolsEvidenceAcquirer {
     fn remote_computer(&self) -> &Computer {
         &self.remote_computer
     }
@@ -86,7 +79,7 @@ impl<
     }
 
     fn remote_connector(&self) -> &dyn Connector {
-        &self.remote_connector
+        self.remote_connector.deref()
     }
 
     fn firewall_state_command(&self) -> Vec<&'static str> {
@@ -149,11 +142,6 @@ impl<
         // )
         // // Export protected roots?
     }
-
-    fn memory_dump_command(&self) -> Vec<&'static str> {
-        vec![]
-    }
-
 
     fn system_event_logs_command(&self) -> Vec<&'static str> {
         vec![

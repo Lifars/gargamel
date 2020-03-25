@@ -4,7 +4,7 @@ pub struct PsExec {}
 
 impl Connector for PsExec {
     fn connect_method_name(&self) -> &'static str {
-        return "PAEXEC";
+        return "PSEXEC";
     }
 
     fn prepare_command(&self,

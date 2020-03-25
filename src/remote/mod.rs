@@ -17,3 +17,7 @@ pub use self::wmi::*;
 pub mod powershell;
 
 pub use self::powershell::*;
+
+pub mod copier;
+
+pub use self::copier::*;
