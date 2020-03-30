@@ -10,22 +10,22 @@ extern crate simplelog;
 
 use clap::derive::Clap;
 use crate::evidence_acquirer::EvidenceAcquirer;
-use std::path::Path;
-use crate::standard_tools_evidence_acquirer::StandardToolsEvidenceAcquirer;
-use crate::wmi_evidence_acquirer::WmiEvidenceAcquirer;
-use crate::remote::{PsExec, PowerShell, Local};
+use std::path::{Path, PathBuf};
+use crate::remote::{PsExec, PsRemote, Local, Computer, Copier, XCopy, PsCopyItem, RemoteCopier};
 use crate::memory_acquirer::MemoryAcquirer;
+use crate::command_runner::CommandRunner;
+use crate::file_acquirer::download_files;
 
 mod process_runner;
 mod evidence_acquirer;
 mod remote;
 mod arg_parser;
 mod logo;
-mod standard_tools_evidence_acquirer;
-mod wmi_evidence_acquirer;
 mod memory_acquirer;
 mod command_utils;
 mod utils;
+mod file_acquirer;
+mod command_runner;
 
 fn setup_logger() {
     CombinedLogger::init(
@@ -76,21 +76,58 @@ fn main() -> Result<(), io::Error> {
 
     let opts: Opts = Opts::parse();
     create_dir_all(&opts.store_directory)?;
-    // let evidence_acquirers = create_evidence_acquirers(&opts);
-    // for acquirer in evidence_acquirers {
-    //     acquirer.run_all(
-    //         opts.custom_command_path.as_ref().map(|v| Path::new(v)),
-    //         opts.search_files_path.as_ref().map(|v| Path::new(v)),
-    //         // force_mem_acquire
-    //     );
-    // }
+    let remote_computer = Computer::from(opts.clone());
+    let local_store_directory = Path::new(&opts.store_directory);
+    let evidence_acquirers = create_evidence_acquirers(
+        &remote_computer,
+        local_store_directory,
+        &opts
+    );
+    for acquirer in evidence_acquirers {
+        acquirer.run_all();
+    }
     if opts.image_memory.is_some() {
-        let memory_acquirer = create_memory_acquirers(&opts);
-        let image_memory_remote_store = opts.image_memory.unwrap();
-        for acquirer in memory_acquirer {
+        let memory_acquirers = create_memory_acquirers(
+            &remote_computer,
+            local_store_directory,
+            &opts
+        );
+        let image_memory_remote_store = opts.image_memory.as_ref().unwrap();
+        for acquirer in memory_acquirers {
+            info!("Running memory acquirer using method {}", acquirer.connector.connect_method_name());
             let image_res = acquirer.image_memory(Path::new(image_memory_remote_store.as_str()));
             if image_res.is_ok() {
                 break;
+            }
+        }
+    }
+    if opts.custom_command_path.is_some() {
+        let command_runners = create_command_runners(
+            &remote_computer,
+            local_store_directory,
+            &opts
+        );
+        for command_runner in command_runners {
+            info!("Running commands using method {}", command_runner.connector.connect_method_name());
+            command_runner.run_commands(Path::new(opts.custom_command_path.as_ref().unwrap()));
+        }
+    }
+    if opts.search_files_path.is_some() {
+        let copiers = create_file_copiers(&opts);
+        let search_files_path = opts.search_files_path.as_ref().unwrap();
+        let search_files_path = Path::new(search_files_path);
+        for copier in copiers {
+            let remote_copier = RemoteCopier::new(
+                &remote_computer,
+                copier.as_ref()
+            );
+            let result = download_files(
+                search_files_path,
+                local_store_directory,
+                &remote_copier
+            );
+            if result.is_ok() {
+              break;
             }
         }
     }
@@ -98,49 +135,58 @@ fn main() -> Result<(), io::Error> {
     Ok(())
 }
 
-fn create_evidence_acquirers(opts: &Opts) -> Vec<Box<dyn EvidenceAcquirer>> {
-    let acquirers: Vec<Box<dyn EvidenceAcquirer>> = if opts.all {
-        let mut acquirers = Vec::<Box<dyn EvidenceAcquirer>>::new();
-        acquirers.push(
-            Box::new(StandardToolsEvidenceAcquirer::from_opts(
-                &opts, Box::new(PsExec {}),
-            ))
-        );
-        acquirers.push(
-            Box::new(WmiEvidenceAcquirer::from_opts(&opts))
-        );
-        acquirers.push(
-            Box::new(StandardToolsEvidenceAcquirer::from_opts(
-                &opts, Box::new(PowerShell {}),
-            ))
-        );
-        acquirers
+fn create_evidence_acquirers<'a>(
+    computer: &'a Computer,
+    local_store_directory: &'a Path,
+    opts: &Opts
+) -> Vec<EvidenceAcquirer<'a>> {
+    let acquirers: Vec<EvidenceAcquirer<'a>> = if opts.all {
+        vec![
+            EvidenceAcquirer::psexec(
+                computer,
+                local_store_directory,
+            ),
+            EvidenceAcquirer::wmi(
+                computer,
+                local_store_directory,
+            ),
+            EvidenceAcquirer::psremote(
+                computer,
+                local_store_directory,
+            )
+        ]
     } else {
-        let mut acquirers = Vec::<Box<dyn EvidenceAcquirer>>::new();
+        let mut acquirers = Vec::<EvidenceAcquirer<'a>>::new();
         if opts.psexec {
             acquirers.push(
-                Box::new(StandardToolsEvidenceAcquirer::from_opts(
-                    &opts, Box::new(PsExec {}),
-                ))
+                EvidenceAcquirer::psexec(
+                    computer,
+                    local_store_directory,
+                ),
             );
         }
         if opts.wmi {
             acquirers.push(
-                Box::new(WmiEvidenceAcquirer::from_opts(&opts))
+                EvidenceAcquirer::wmi(
+                    computer,
+                    local_store_directory,
+                ),
             );
         }
         if opts.psrem {
             acquirers.push(
-                Box::new(StandardToolsEvidenceAcquirer::from_opts(
-                    &opts, Box::new(PowerShell {}),
-                ))
+                EvidenceAcquirer::psremote(
+                    computer,
+                    local_store_directory,
+                )
             );
         }
         if opts.local {
             acquirers.push(
-                Box::new(StandardToolsEvidenceAcquirer::from_opts(
-                    &opts, Box::new(Local {}),
-                ))
+                EvidenceAcquirer::local(
+                    computer,
+                    local_store_directory,
+                )
             )
         }
         acquirers
@@ -148,41 +194,92 @@ fn create_evidence_acquirers(opts: &Opts) -> Vec<Box<dyn EvidenceAcquirer>> {
     acquirers
 }
 
-
-fn create_memory_acquirers(opts: &Opts) -> Vec<MemoryAcquirer> {
-    let acquirers: Vec<MemoryAcquirer> = if opts.all {
-        let mut acquirers = Vec::<MemoryAcquirer>::new();
-        acquirers.push(
-            MemoryAcquirer::from_opts(
-                &opts, Box::new(PsExec {}),
-            )
-        );
-        acquirers.push(
-            MemoryAcquirer::from_opts(
-                &opts, Box::new(PowerShell {}),
-            )
-        );
-        acquirers
+fn create_memory_acquirers<'a>(
+    computer: &'a Computer,
+    local_store_directory: &'a Path,
+    opts: &Opts
+) -> Vec<MemoryAcquirer<'a>> {
+    let acquirers: Vec<MemoryAcquirer<'a>> = if opts.all {
+        vec![
+            MemoryAcquirer::psexec(
+                computer,
+                local_store_directory,
+            ),
+            MemoryAcquirer::psremote(
+                computer,
+                local_store_directory,
+            ),
+        ]
     } else {
         let mut acquirers = Vec::<MemoryAcquirer>::new();
         if opts.psexec {
             acquirers.push(
-                MemoryAcquirer::from_opts(
-                    &opts, Box::new(PsExec {}),
+                MemoryAcquirer::psexec(
+                    computer,
+                    local_store_directory,
                 )
             );
         }
         if opts.psrem {
             acquirers.push(
-                MemoryAcquirer::from_opts(
-                    &opts, Box::new(PowerShell {}),
+                MemoryAcquirer::psremote(
+                    computer,
+                    local_store_directory,
+                )
+            );
+        }
+        // if opts.local {
+        //     acquirers.push(
+        //         MemoryAcquirer::local(
+        //             Computer::from(opts.clone()),
+        //             PathBuf::from(opts.store_directory.clone())
+        //         )
+        //     )
+        // }
+        acquirers
+    };
+    acquirers
+}
+
+fn create_command_runners<'a>(
+    computer: &'a Computer,
+    local_store_directory: &'a Path,
+    opts: &Opts
+) -> Vec<CommandRunner<'a>> {
+    let acquirers: Vec<CommandRunner<'a>> = if opts.all {
+        vec![
+            CommandRunner::psexec(
+                computer,
+                local_store_directory,
+            ),
+            CommandRunner::psremote(
+                computer,
+                local_store_directory,
+            ),
+        ]
+    } else {
+        let mut acquirers = Vec::<CommandRunner>::new();
+        if opts.psexec {
+            acquirers.push(
+                CommandRunner::psexec(
+                    computer,
+                    local_store_directory,
+                )
+            );
+        }
+        if opts.psrem {
+            acquirers.push(
+                CommandRunner::psremote(
+                    computer,
+                    local_store_directory,
                 )
             );
         }
         if opts.local {
             acquirers.push(
-                MemoryAcquirer::from_opts(
-                    &opts, Box::new(Local {}),
+                CommandRunner::local(
+                    computer,
+                    local_store_directory,
                 )
             )
         }
@@ -190,3 +287,27 @@ fn create_memory_acquirers(opts: &Opts) -> Vec<MemoryAcquirer> {
     };
     acquirers
 }
+
+fn create_file_copiers(opts: &Opts) -> Vec<Box<dyn Copier>> {
+    let acquirers: Vec<Box<dyn Copier>> = if opts.all {
+        vec![
+            Box::new(XCopy {}),
+            Box::new(PsCopyItem {})
+        ]
+    } else {
+        let mut acquirers = Vec::<Box<dyn Copier>>::new();
+        if opts.psexec {
+            acquirers.push(
+                Box::new(XCopy {})
+            )
+        }
+        if opts.psrem {
+            acquirers.push(
+                Box::new(PsCopyItem {})
+            );
+        }
+        acquirers
+    };
+    acquirers
+}
+

@@ -1,8 +1,8 @@
 use crate::remote::{Connector, Computer};
 
-pub struct PowerShell {}
+pub struct PsRemote {}
 
-impl Connector for PowerShell {
+impl Connector for PsRemote {
     fn connect_method_name(&self) -> &'static str {
         return "PSREM";
     }

@@ -1,20 +1,71 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use crate::remote::Computer;
 use std::io;
 use crate::process_runner::run_process_blocking;
+use std::io::Error;
 
-/// Use Copier::new(...) to properly initialize the struct.
-pub struct Copier<'a> {
-    computer: &'a Computer
+pub trait Copier {
+    fn copy_file(
+        &self,
+        source: &Path,
+        target: &Path,
+    ) -> io::Result<()>;
 }
 
-impl<'a> Drop for Copier<'a> {
+pub struct XCopy {}
+
+impl Copier for XCopy {
+    fn copy_file(
+        &self,
+        source: &Path,
+        target: &Path,
+    ) -> io::Result<()> {
+        let mut args = vec![
+            source.to_string_lossy().to_string(),
+            target.to_string_lossy().to_string(),
+            "/y".to_string()
+        ];
+        run_process_blocking(
+            "xcopy",
+            &args,
+        )
+    }
+}
+
+pub struct PsCopyItem {}
+
+impl Copier for PsCopyItem {
+    fn copy_file(
+        &self,
+        source: &Path,
+        target: &Path,
+    ) -> io::Result<()> {
+        let args = vec![
+            "Copy-Item".to_string(),
+            format!("'{}'", source.to_string_lossy()),
+            format!("'{}'", target.to_string_lossy()),
+        ];
+        run_process_blocking(
+            "powershell.exe",
+            &args,
+        )
+    }
+}
+
+/// Use factory mathods to properly initialize the struct.
+pub struct RemoteCopier<'a> {
+    pub computer: &'a Computer,
+    pub copier_impl: &'a dyn Copier,
+}
+
+impl<'a> Drop for RemoteCopier<'a> {
     fn drop(&mut self) {
         run_process_blocking(
             "NET",
             &[
                 "USE".to_string(),
-                format!("\\\\{}\\IPC$", self.computer.address),
+                // format!("\\\\{}\\IPC$", self.computer.address),
+                format!("\\\\{}", self.computer.address),
                 "/D".to_string()
             ],
         ).expect(&format!(
@@ -23,8 +74,11 @@ impl<'a> Drop for Copier<'a> {
     }
 }
 
-impl Copier<'_> {
-    pub fn new(computer: &Computer) -> Copier {
+impl<'a> RemoteCopier<'a> {
+    pub fn new(
+        computer: &'a Computer,
+        implementation: &'a dyn Copier,
+    ) -> RemoteCopier<'a> {
         run_process_blocking(
             "NET",
             &[
@@ -36,76 +90,59 @@ impl Copier<'_> {
         ).expect(&format!(
             "Cannot establish connection using \"net use\" to {}", &computer.address
         ));
-        Copier { computer }
+        RemoteCopier { computer, copier_impl: implementation }
+    }
+
+    fn path_to_remote_form(
+        &self,
+        path: &Path,
+    ) -> PathBuf {
+        PathBuf::from(format!(
+            "\\\\{}\\{}",
+            self.computer.address,
+            path.to_str().unwrap().replacen(":", "$", 1)
+        ))
     }
 
     pub fn copy_to_remote(
         &self,
         source: &Path,
         target: &Path,
-        filename: Option<&str>,
     ) -> io::Result<()> {
-        self.copy_file(source, target, filename, true)
+        self.copier_impl.copy_file(source, &self.path_to_remote_form(target))
     }
 
     pub fn copy_from_remote(
         &self,
         source: &Path,
         target: &Path,
-        filename: Option<&str>,
     ) -> io::Result<()> {
-        self.copy_file(source, target, filename, false)
-    }
-
-    pub fn copy_file(
-        &self,
-        source: &Path,
-        target: &Path,
-        filename: Option<&str>,
-        target_is_remote: bool,
-    ) -> io::Result<()> {
-        let mut args = self.source_target(source, target, target_is_remote);
-        match filename {
-            None => {}
-            Some(filename) => args.push(filename.to_string()),
-        }
-        args.push("/R:1".to_string());
-        args.push("/W:1".to_string());
-        args.push("/V".to_string());
-        args.push("/TEE".to_string());
-        run_process_blocking(
-            "robocopy",
-            &args,
-        )
-    }
-
-    fn source_target(&self,
-                     source: &Path,
-                     target: &Path,
-                     target_is_remote: bool,
-    ) -> Vec<String> {
-        if target_is_remote {
-            vec![
-                source.to_str().unwrap().to_string(),
-                self.path_to_remote_form(target),
-            ]
-        } else {
-            vec![
-                self.path_to_remote_form(source),
-                target.to_str().unwrap().to_string(),
-            ]
-        }
-    }
-
-    fn path_to_remote_form(
-        &self,
-        path: &Path,
-    ) -> String {
-        format!(
-            "\\\\{}\\{}",
-            self.computer.address,
-            path.to_str().unwrap().replacen(":", "$", 1)
-        )
+        self.copier_impl.copy_file(&self.path_to_remote_form(source), target)
     }
 }
 
+// pub struct Downloader<'a> {
+//     remote_copier: &'a RemoteCopier<'a>
+// }
+//
+// pub struct Uploader<'a> {
+//     remote_copier: &'a RemoteCopier<'a>
+// }
+//
+// impl<'a> Copier for Downloader<'a> {
+//     fn copy_file(&self,
+//                  source: &Path,
+//                  target: &Path,
+//     ) -> io::Result<()> {
+//         self.remote_copier.copy_from_remote(source, target)
+//     }
+// }
+//
+// impl<'a> Copier for Uploader<'a> {
+//     fn copy_file(&self,
+//                  source: &Path,
+//                  target: &Path,
+//     ) -> io::Result<()> {
+//         self.remote_copier.copy_to_remote(source, target)
+//     }
+// }

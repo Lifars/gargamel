@@ -1,17 +1,182 @@
 use std::io::{Result, Error};
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use crate::remote::{Computer, Connector, Connection};
+use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Wmi};
 use std::ffi::OsStr;
 use crate::command_utils::parse_command;
 use std::ops::Deref;
 
-pub trait EvidenceAcquirer {
-    fn remote_computer(&self) -> &Computer;
-    fn store_directory(&self) -> &PathBuf;
-    fn remote_connector(&self) -> &dyn Connector;
+pub struct EvidenceAcquirer<'a> {
+    remote_computer: &'a Computer,
+    store_directory: &'a Path,
+    connector: Box<dyn Connector>,
 
-    fn _run(
+    firewall_state_command: Option<Vec<&'static str>>,
+    network_state_command: Option<Vec<&'static str>>,
+    logged_users_command: Option<Vec<&'static str>>,
+    running_processes_command: Option<Vec<&'static str>>,
+    active_network_connections_command: Option<Vec<&'static str>>,
+    registry_hklm_command: Option<Vec<&'static str>>,
+    registry_hkcu_command: Option<Vec<&'static str>>,
+    registry_hkcr_command: Option<Vec<&'static str>>,
+    registry_hku_command: Option<Vec<&'static str>>,
+    registry_hkcc_command: Option<Vec<&'static str>>,
+    system_event_logs_command: Option<Vec<&'static str>>,
+    application_event_logs_command: Option<Vec<&'static str>>,
+}
+
+impl<'a> EvidenceAcquirer<'a> {
+    fn new_standard_acquirer(
+        remote_computer: &'a Computer,
+        store_directory: &'a Path,
+        remote_connector: Box<dyn Connector>,
+    ) -> EvidenceAcquirer<'a> {
+        EvidenceAcquirer {
+            remote_computer,
+            store_directory,
+            connector: remote_connector,
+            firewall_state_command: Some(vec![
+                "netsh",
+                "advfirewall",
+                "show",
+                "allprofiles",
+                "state",
+            ]),
+            network_state_command: Some(vec![
+                "ipconfig",
+                "/all"
+            ]),
+            logged_users_command: Some(vec![
+                "query",
+                "user"
+            ]),
+            running_processes_command: Some(vec![
+                "tasklist"
+            ]),
+            active_network_connections_command: Some(vec![
+                "netstat",
+                "-ano"
+            ]),
+            registry_hklm_command: Some(vec![
+                "reg",
+                "export",
+                "HKLM"
+            ]),
+            registry_hkcu_command: Some(vec![
+                "reg",
+                "export",
+                "HKCU"
+            ]),
+            registry_hkcr_command: Some(vec![
+                "reg",
+                "export",
+                "HKCR"
+            ]),
+            registry_hku_command: Some(vec![
+                "reg",
+                "export",
+                "HKU"
+            ]),
+            registry_hkcc_command: Some(vec![
+                "reg",
+                "export",
+                "HKCC"
+            ]),
+            system_event_logs_command: Some(vec![
+                "wevtutil",
+                "qe",
+                "system"
+            ]),
+            application_event_logs_command: Some(vec![
+                "wevtutil",
+                "qe",
+                "application"
+            ]),
+        }
+    }
+
+    pub fn psexec(
+        remote_computer: &'a Computer,
+        store_directory: &'a Path,
+    ) -> EvidenceAcquirer<'a> {
+        EvidenceAcquirer::new_standard_acquirer(
+            remote_computer,
+            store_directory,
+            Box::new(PsExec {}),
+        )
+    }
+
+    pub fn psremote(
+        remote_computer: &'a Computer,
+        store_directory: &'a Path,
+    ) -> EvidenceAcquirer<'a> {
+        EvidenceAcquirer::new_standard_acquirer(
+            remote_computer,
+            store_directory,
+            Box::new(PsRemote {}),
+        )
+    }
+
+    pub fn local(
+        remote_computer: &'a Computer,
+        store_directory: &'a Path,
+    ) -> EvidenceAcquirer<'a> {
+        EvidenceAcquirer::new_standard_acquirer(
+            remote_computer,
+            store_directory,
+            Box::new(Local {}),
+        )
+    }
+
+    pub fn wmi(
+        remote_computer: &'a Computer,
+        store_directory: &'a Path,
+    ) -> EvidenceAcquirer<'a> {
+        EvidenceAcquirer {
+            remote_computer,
+            store_directory,
+            connector: Box::new(Wmi{}),
+            firewall_state_command: None,
+            network_state_command: Some(vec![
+                "nic",
+                "get",
+                "AdapterType,",
+                "Name,",
+                "Installed,",
+                "MACAddress,",
+                "PowerManagementSupported,",
+                "Speed"
+            ]),
+            logged_users_command: Some(vec![
+                "COMPUTERSYSTEM",
+                "GET",
+                "USERNAME"
+            ]),
+            running_processes_command: Some(vec![
+                "process"
+            ]),
+            active_network_connections_command: Some(vec![
+                "netuse"
+            ]),
+            registry_hklm_command: None,
+            registry_hkcu_command: None,
+            registry_hkcr_command: None,
+            registry_hku_command: None,
+            registry_hkcc_command: None,
+            system_event_logs_command: Some(vec![
+                "NTEVENT",
+                "WHERE",
+                "LogFile='system"
+            ]),
+            application_event_logs_command: Some(vec![
+                "NTEVENT",
+                "WHERE",
+                "LogFile='application"
+            ]),
+        }
+    }
+
+    fn run(
         &self,
         command: &[&str],
         report_filename_prefix: &str,
@@ -19,155 +184,155 @@ pub trait EvidenceAcquirer {
         if command.is_empty() {
             return;
         }
-        let remote_connection = Connection::new(
-            self.remote_computer(),
+        let remote_connection = Command::new(
+            &self.remote_computer,
             command.iter().map(|it| it.to_string()).collect(),
-            Some(self.store_directory()),
+            Some(&self.store_directory),
             report_filename_prefix,
         );
 
         info!("{}: Checking {}",
-              self.remote_connector().connect_method_name(),
+              self.connector.connect_method_name(),
               report_filename_prefix.replace("_", " ")
         );
 
-        match self.remote_connector().connect_and_run_command(remote_connection) {
+        match self.connector.connect_and_run_command(remote_connection) {
             Ok(_) => {}
             Err(err) => { error!("Error running command {:?}. Cause: {}", command, err) }
         }
     }
 
-    fn firewall_state_command(&self) -> Vec<&'static str>;
-    fn firewall_state(&self) {
-        self._run(
-            &self.firewall_state_command(),
-            "firewall_status",
-        )
-    }
-
-    fn network_state_command(&self) -> Vec<&'static str>;
-    fn network_state(&self) {
-        self._run(
-            &self.network_state_command(),
-            "network_status",
-        )
-    }
-
-    fn logged_users_command(&self) -> Vec<&'static str>;
-    fn logged_users(&self) {
-        self._run(
-            &self.logged_users_command(),
-            "logged_users",
-        )
-    }
-
-    fn running_processes_command(&self) -> Vec<&'static str>;
-    fn running_processes(&self) {
-        self._run(
-            &self.running_processes_command(),
-            "running_tasks",
-        )
-    }
-
-    fn active_network_connections_command(&self) -> Vec<&'static str>;
-    fn active_network_connections(&self) {
-        self._run(
-            &self.active_network_connections_command(),
-            "active_network_connections",
-        )
-    }
-
-    fn run_commands(&self, command_file: &Path) {
-        // UNTESTED
-        let file = match File::open(command_file) {
-            Ok(file) => file,
-            Err(err) => {
-                error!("{}", err);
-                return;
-            }
-        };
-        let reader = std::io::BufReader::new(file);
-        use std::io::BufRead;
-        for one_command in reader.lines().filter_map(|item| item.ok()) {
-            if one_command.starts_with("#") {
-                continue;
-            }
-            if one_command.is_empty() {
-                continue;
-            }
-            debug!("Running remote command {}", one_command);
-            let command = parse_command(&one_command);
-
-            let first_arg = command[0].to_ascii_lowercase();
-            let command = if first_arg.starts_with(":") {
-                let method_name = self.remote_connector().connect_method_name().to_ascii_lowercase();
-                if first_arg.contains(&method_name) {
-                    command[1..].to_vec()
-                } else {
-                    continue;
-                }
-            } else {
-                command
-            };
-
-            let command_joined: String = command.join("-");
-            let command_joined = if command_joined.len() > 100 {
-                command_joined[..100].to_string()
-            } else {
-                command_joined
-            };
-            let command_joined = command_joined
-                .replace(" ", "-")
-                .replace("\"", "")
-                .replace("/", "")
-                .replace("\\", "")
-                .replace(":", "-");
-            let report_filename_prefix = format!("custom_{}", command_joined);
-
-            let remote_connection = Connection::new(
-                self.remote_computer(),
-                command,
-                Some(self.store_directory()),
-                &report_filename_prefix,
-            );
-            match self.remote_connector().connect_and_run_command(remote_connection) {
-                Ok(_) => {}
-                Err(err) => { error!("{}", err) }
-            };
+    pub fn firewall_state(&self) {
+        match &self.firewall_state_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "firewall_status",
+                )
+            },
         }
     }
 
-
-    fn registry(&self);
-
-    #[allow(unused_variables)] // DELETE THIS LINE AFTER IMPLEMENTING THE FUNCTION
-    fn files(&self, file_list: &Path) {
-        info!("Searching remote files");
+    pub fn network_state(&self) {
+        match &self.network_state_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "network_status",
+                )
+            },
+        }
     }
 
-    // fn memory_dump_command(&self) -> Vec<&'static str>;
-    // fn memory_dump(&self) {
-    //     info!("Creating memory dump");
-    // }
-
-    fn system_event_logs_command(&self) -> Vec<&'static str>;
-    fn application_event_logs_command(&self) -> Vec<&'static str>;
-    fn event_logs(&self) {
-        self._run(
-            &self.system_event_logs_command(),
-            "events_system",
-        );
-        self._run(
-            &self.application_event_logs_command(),
-            "events_application",
-        );
+    pub fn logged_users(&self) {
+        match &self.logged_users_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "logged_users",
+                )
+            },
+        }
     }
 
-    fn run_all(
+    pub fn running_processes(&self) {
+        match &self.running_processes_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "running_processes",
+                )
+            },
+        }
+    }
+
+    pub fn active_network_connections(&self) {
+        match &self.active_network_connections_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "active_network_connections",
+                )
+            },
+        }
+    }
+
+    pub fn registry(&self) {
+        match &self.registry_hklm_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "registry_hklm",
+                )
+            },
+        }
+        match &self.registry_hkcu_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "registry_hkcu",
+                )
+            },
+        }
+        match &self.registry_hku_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "registry_hku",
+                )
+            },
+        }
+        match &self.registry_hkcr_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "registry_hkcr",
+                )
+            },
+        }
+        match &self.registry_hkcc_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "registry_hkcc",
+                )
+            },
+        }
+    }
+
+    pub fn event_logs(&self) {
+        match &self.system_event_logs_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "events_system",
+                )
+            },
+        };
+        match &self.application_event_logs_command {
+            None => {},
+            Some(command) => {
+                self.run(
+                    command,
+                    "events_application",
+                )
+            },
+        };
+    }
+
+    pub fn run_all(
         &self,
-        command_file: Option<&Path>,
-        file_list: Option<&Path>,
-        // memory_acquire: bool,
     ) {
         self.firewall_state();
         self.network_state();
@@ -175,14 +340,5 @@ pub trait EvidenceAcquirer {
         self.running_processes();
         self.event_logs();
         self.logged_users();
-        if command_file.is_some() {
-            self.run_commands(command_file.unwrap());
-        }
-        if file_list.is_some() {
-            self.files(file_list.unwrap());
-        }
-        // if memory_acquire {
-        //     self.memory_dump();
-        // }
     }
 }

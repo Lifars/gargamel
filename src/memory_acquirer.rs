@@ -1,29 +1,49 @@
-use crate::remote::{Connector, Computer, Connection};
+use crate::remote::{Connector, Computer, Command, PsExec, Local, PsRemote, RemoteCopier, Copier, XCopy, PsCopyItem};
 use std::path::{PathBuf, Path};
 use crate::arg_parser::Opts;
 use std::io;
-use crate::remote::Copier;
 use crate::utils::Quoted;
 
-pub struct MemoryAcquirer {
-    pub remote_computer: Computer,
-    pub local_store_directory: PathBuf,
+pub struct MemoryAcquirer<'a> {
+    pub computer: &'a Computer,
+    pub local_store_directory: &'a Path,
     pub connector: Box<dyn Connector>,
+    pub copier: Box<dyn Copier>,
 }
 
-impl MemoryAcquirer {
-    pub fn from_opts(
-        opts: &Opts,
-        connector: Box<dyn Connector>,
-    ) -> MemoryAcquirer {
+impl<'a> MemoryAcquirer<'a> {
+    pub fn psexec(
+        remote_computer: &'a Computer,
+        local_store_directory: &'a Path,
+    ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
-            remote_computer: Computer {
-                address: opts.computer.clone(),
-                username: opts.user.clone(),
-                password: opts.password.clone(),
-            },
-            local_store_directory: PathBuf::from(&opts.store_directory),
-            connector,
+            computer: remote_computer,
+            local_store_directory,
+            connector: Box::new(PsExec {}),
+            copier: Box::new(XCopy {}),
+        }
+    }
+
+    // pub fn wmi(
+    //     remote_computer: Computer,
+    //     local_store_directory: PathBuf,
+    // )-> MemoryAcquirer{
+    //     MemoryAcquirer{
+    //         remote_computer,
+    //         local_store_directory,
+    //         connector: Box::new(WmiProcess {})
+    //     }
+    // }
+
+    pub fn psremote(
+        remote_computer: &'a Computer,
+        local_store_directory: &'a Path,
+    ) -> MemoryAcquirer<'a> {
+        MemoryAcquirer {
+            computer: remote_computer,
+            local_store_directory,
+            connector: Box::new(PsRemote {}),
+            copier: Box::new(PsCopyItem {}),
         }
     }
 
@@ -33,23 +53,26 @@ impl MemoryAcquirer {
     ) -> io::Result<()> {
         // self.run_command(target_store);
         // self.extract_file()
-        let current_dir = std::env::current_dir()?;
+
         let winpmem = "winpmem.exe";
-        let copier = Copier::new(&self.remote_computer);
-        let target_store_path = match target_name.parent(){
-            None => Path::new("C:\\Users\\Public"),
-            Some(parent) => parent,
+        let source_winpmem = std::env::current_dir()?.join(winpmem);
+        let target_name = match target_name.parent() {
+            None => Path::new("C:\\Users\\Public").join(target_name),
+            Some(parent) => target_name.to_owned(),
         };
-        copier.copy_to_remote(
-            &current_dir,
-            target_store_path,
-            Some(winpmem)
+        let target_store = target_name.parent().unwrap();
+        let target_winpmem = target_store.join(winpmem);
+        let remote_copier = RemoteCopier{
+            computer: &self.computer,
+            copier_impl: self.copier.as_ref()
+        };
+        remote_copier.copy_to_remote(
+            &source_winpmem,
+            &target_store,
         )?;
-        let target_winpmem = target_store_path
-            .join(winpmem);
         trace!("Winpmem target path: {:#?}", target_winpmem);
-        let connection = Connection {
-            remote_computer: &self.remote_computer,
+        let connection = Command {
+            remote_computer: &self.computer,
             command: vec![
                 target_winpmem.to_string_lossy().to_string(),
                 "--format".to_string(),
@@ -60,15 +83,11 @@ impl MemoryAcquirer {
             store_directory: None,
             report_filename_prefix: "mem-ack-log",
         };
-        trace!("Tu nedejdzem");
         self.connector.connect_and_run_command(connection)?;
-
-        copier.copy_from_remote(
-            target_store_path,
+        remote_copier.copy_from_remote(
+            &target_name,
             &self.local_store_directory,
-            target_name
-                .file_name()
-                .map(|it| it.to_str().expect("Specified filename for memory image is not Unicode")),
+            // &self.local_store_directory.join(target_name.file_name().unwrap()),
         )
     }
 }

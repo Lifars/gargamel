@@ -1,6 +1,6 @@
 use clap::Clap;
 
-#[derive(Clap)]
+#[derive(Clap, Clone)]
 #[clap(version = "1.0", author = "LIFARS LLC")]
 pub struct Opts {
     #[clap(

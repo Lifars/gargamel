@@ -14,9 +14,9 @@ pub mod wmi;
 
 pub use self::wmi::*;
 
-pub mod powershell;
+pub mod psremote;
 
-pub use self::powershell::*;
+pub use self::psremote::*;
 
 pub mod copier;
 
