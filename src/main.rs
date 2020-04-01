@@ -13,7 +13,7 @@ extern crate simplelog;
 use clap::derive::Clap;
 use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::{Path, PathBuf};
-use crate::remote::{PsExec, PsRemote, Local, Computer, Copier, XCopy, PsCopyItem, RemoteCopier, Scp, WindowsRemoteCopier, ScpRemoteCopier};
+use crate::remote::{Computer, Copier, XCopy, PsCopyItem, WindowsRemoteCopier, ScpRemoteCopier};
 use crate::memory_acquirer::MemoryAcquirer;
 use crate::command_runner::CommandRunner;
 use crate::file_acquirer::download_files;
@@ -91,10 +91,12 @@ fn main() -> Result<(), io::Error> {
 
     let remote_computer = Computer::from(opts.clone());
     let local_store_directory = Path::new(&opts.store_directory);
+    let key_file = opts.ssh_key.clone().map(|it| PathBuf::from(it));
     let evidence_acquirers = create_evidence_acquirers(
         &remote_computer,
         local_store_directory,
         &opts,
+        key_file.as_ref().map(|it| it.to_path_buf())
     );
     for acquirer in evidence_acquirers {
         acquirer.run_all();
@@ -119,6 +121,7 @@ fn main() -> Result<(), io::Error> {
             &remote_computer,
             local_store_directory,
             &opts,
+            key_file.as_ref().map(|it| it.to_path_buf())
         );
         for command_runner in command_runners {
             info!("Running commands using method {}", command_runner.connector.connect_method_name());
@@ -131,6 +134,7 @@ fn main() -> Result<(), io::Error> {
         if opts.ssh {
             let remote_copier = ScpRemoteCopier::new(
                 &remote_computer,
+                key_file.as_ref().map(|it| it.as_path())
             );
             download_files(
                 search_files_path,
@@ -138,7 +142,7 @@ fn main() -> Result<(), io::Error> {
                 &remote_copier,
             )?;
         } else {
-            let copiers = create_windows_file_copiers(&opts, &remote_computer);
+            let copiers = create_windows_file_copiers(&opts);
             for copier in copiers {
                 let remote_copier = WindowsRemoteCopier::new(
                     &remote_computer,
@@ -163,6 +167,7 @@ fn create_evidence_acquirers<'a>(
     computer: &'a Computer,
     local_store_directory: &'a Path,
     opts: &Opts,
+    key_file: Option<PathBuf>
 ) -> Vec<EvidenceAcquirer<'a>> {
     let acquirers: Vec<EvidenceAcquirer<'a>> = if opts.all {
         vec![
@@ -218,6 +223,7 @@ fn create_evidence_acquirers<'a>(
                 EvidenceAcquirer::ssh(
                     computer,
                     local_store_directory,
+                    key_file
                 )
             )
         }
@@ -277,6 +283,7 @@ fn create_command_runners<'a>(
     computer: &'a Computer,
     local_store_directory: &'a Path,
     opts: &Opts,
+    key_file: Option<PathBuf>
 ) -> Vec<CommandRunner<'a>> {
     let acquirers: Vec<CommandRunner<'a>> = if opts.all {
         vec![
@@ -320,6 +327,15 @@ fn create_command_runners<'a>(
                 CommandRunner::ssh(
                     computer,
                     local_store_directory,
+                    key_file
+                )
+            )
+        }
+        if opts.wmi {
+            acquirers.push(
+                CommandRunner::wmi(
+                    computer,
+                    local_store_directory,
                 )
             )
         }
@@ -328,7 +344,7 @@ fn create_command_runners<'a>(
     acquirers
 }
 
-fn create_windows_file_copiers(opts: &Opts, computer: &Computer) -> Vec<Box<dyn Copier>> {
+fn create_windows_file_copiers(opts: &Opts) -> Vec<Box<dyn Copier>> {
     let acquirers: Vec<Box<dyn Copier>> = if opts.all {
         vec![
             Box::new(XCopy {}),

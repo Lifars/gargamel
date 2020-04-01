@@ -1,10 +1,12 @@
 use crate::remote::{Connector, Computer, Command};
-use std::io::Error;
 use std::io;
 use crate::process_runner::{create_report_path, run_piped_processes_blocking};
 use std::fs::File;
+use std::path::PathBuf;
 
-pub struct Ssh{}
+pub struct Ssh{
+    pub key_file: Option<PathBuf>
+}
 
 impl Connector for Ssh {
     fn connect_method_name(&self) -> &'static str {
@@ -50,7 +52,7 @@ impl Connector for Ssh {
 
     fn prepare_command(&self, remote_computer: &Computer, command: Vec<String>, output_file_path: Option<String>) -> Vec<String> {
         let program_name = "plink.exe".to_string();
-        let prefix = vec![
+        let mut prefix = vec![
             program_name,
             "-ssh".to_string(),
             remote_computer.address.clone(),
@@ -60,6 +62,10 @@ impl Connector for Ssh {
             remote_computer.password.clone(),
             "-no-antispoof".to_string()
         ];
+        if self.key_file.is_some() {
+            prefix.push("-i".to_string());
+            prefix.push(self.key_file.as_ref().unwrap().to_string_lossy().to_string())
+        }
         let almost_result = prefix.into_iter()
             .chain(command.into_iter());
         match output_file_path {

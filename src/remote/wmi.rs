@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, RemoteCopier};
+use crate::remote::{Connector, Computer};
 
 pub struct Wmi {}
 

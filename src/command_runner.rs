@@ -7,6 +7,7 @@ pub struct CommandRunner<'a> {
     remote_computer: &'a Computer,
     local_store_directory: &'a Path,
     pub(crate) connector: Box<dyn Connector>,
+    run_implicit: bool
 }
 
 impl<'a> CommandRunner<'a> {
@@ -18,7 +19,8 @@ impl<'a> CommandRunner<'a> {
         CommandRunner{
             remote_computer,
             local_store_directory,
-            connector: Box::new(PsExec{})
+            connector: Box::new(PsExec{}),
+            run_implicit: true
         }
     }
 
@@ -29,7 +31,8 @@ impl<'a> CommandRunner<'a> {
         CommandRunner{
             remote_computer,
             local_store_directory,
-            connector: Box::new(WmiProcess {})
+            connector: Box::new(WmiProcess {}),
+            run_implicit: false
         }
     }
 
@@ -40,7 +43,8 @@ impl<'a> CommandRunner<'a> {
         CommandRunner{
             remote_computer,
             local_store_directory,
-            connector: Box::new(Local{})
+            connector: Box::new(Local{}),
+            run_implicit: true
         }
     }
 
@@ -51,18 +55,21 @@ impl<'a> CommandRunner<'a> {
         CommandRunner{
             remote_computer,
             local_store_directory,
-            connector: Box::new(PsRemote{})
+            connector: Box::new(PsRemote{}),
+            run_implicit: true
         }
     }
 
     pub fn ssh(
         remote_computer: &'a Computer,
         local_store_directory: &'a Path,
+        key_file: Option<PathBuf>
     )-> CommandRunner<'a>{
         CommandRunner{
             remote_computer,
             local_store_directory,
-            connector: Box::new(Ssh{})
+            connector: Box::new(Ssh{ key_file }),
+            run_implicit: false
         }
     }
 
@@ -97,8 +104,10 @@ impl<'a> CommandRunner<'a> {
                 } else {
                     continue;
                 }
-            } else {
+            } else if self.run_implicit {
                 command
+            }else {
+                continue
             };
 
             let command_joined: String = command.join("-");

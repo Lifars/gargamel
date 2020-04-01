@@ -1,8 +1,7 @@
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Ssh};
+use crate::remote::Computer;
 use std::io;
 use crate::process_runner::{run_process_blocking, run_piped_processes_blocking};
-use std::io::Error;
 
 pub trait Copier {
     fn copy_file(
@@ -20,7 +19,7 @@ impl Copier for XCopy {
         source: &Path,
         target: &Path,
     ) -> io::Result<()> {
-        let mut args = vec![
+        let args = vec![
             source.to_string_lossy().to_string(),
             target.to_string_lossy().to_string(),
             "/y".to_string()
@@ -54,6 +53,7 @@ impl Copier for PsCopyItem {
 
 pub struct Scp<'a> {
     pub computer: &'a Computer,
+    pub key_file: Option<&'a Path>,
 }
 
 impl<'a> Copier for Scp<'a> {
@@ -62,6 +62,18 @@ impl<'a> Copier for Scp<'a> {
         source: &Path,
         target: &Path,
     ) -> io::Result<()> {
+        let mut scp = vec![
+            "-l".to_string(),
+            self.computer.username.clone(),
+            "-pw".to_string(),
+            self.computer.password.clone(),
+        ];
+        if self.key_file.is_some() {
+            scp.push("-i".to_string());
+            scp.push(self.key_file.unwrap().to_string_lossy().to_string())
+        }
+        scp.push(format!("{}", source.to_string_lossy()));
+        scp.push(format!("{}", target.to_string_lossy()));
         run_piped_processes_blocking(
             "cmd",
             &[
@@ -70,14 +82,7 @@ impl<'a> Copier for Scp<'a> {
                 "n".to_string()
             ],
             "pscp.exe",
-            &[
-                "-l".to_string(),
-                self.computer.username.clone(),
-                "-pw".to_string(),
-                self.computer.password.clone(),
-                format!("{}", source.to_string_lossy()),
-                format!("{}", target.to_string_lossy()),
-            ],
+            &scp,
         )
     }
 }
@@ -175,17 +180,23 @@ pub struct ScpRemoteCopier<'a> {
     copier_impl: Scp<'a>,
 }
 
-impl<'a> ScpRemoteCopier<'a>{
-    pub fn new(computer: &'a Computer) -> ScpRemoteCopier{
-        ScpRemoteCopier{
-            copier_impl: Scp { computer }
+impl<'a> ScpRemoteCopier<'a> {
+    pub fn new(
+        computer: &'a Computer,
+        key_file: Option<&'a Path>
+    ) -> ScpRemoteCopier<'a> {
+        ScpRemoteCopier {
+            copier_impl: Scp {
+                computer,
+                key_file
+            }
         }
     }
 }
 
 impl<'a> RemoteCopier for ScpRemoteCopier<'a> {
     fn computer(&self) -> &Computer {
-       self.copier_impl.computer
+        self.copier_impl.computer
     }
 
     fn copier_impl(&self) -> &dyn Copier {

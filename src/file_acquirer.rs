@@ -1,9 +1,8 @@
-use crate::remote::{Computer, Connector, RemoteCopier};
-use std::path::{PathBuf, Path};
+use crate::remote::RemoteCopier;
+use std::path::Path;
 use std::io;
 use std::fs::File;
-use std::io::{BufReader, BufRead, Error};
-use std::ffi::OsStr;
+use std::io::{BufReader, BufRead};
 
 pub fn download_files(file_list: &Path,
                       local_store_directory: &Path,

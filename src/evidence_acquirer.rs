@@ -1,10 +1,5 @@
-use std::io::{Result, Error};
 use std::path::{Path, PathBuf};
-use std::fs::File;
 use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Wmi, Ssh};
-use std::ffi::OsStr;
-use crate::command_utils::parse_command;
-use std::ops::Deref;
 
 pub struct EvidenceAcquirer<'a> {
     remote_computer: &'a Computer,
@@ -179,11 +174,12 @@ impl<'a> EvidenceAcquirer<'a> {
     pub fn ssh(
         remote_computer: &'a Computer,
         store_directory: &'a Path,
+        key_file: Option<PathBuf>
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer {
             remote_computer,
             store_directory,
-            connector: Box::new(Ssh{}),
+            connector: Box::new(Ssh{ key_file }),
             firewall_state_command: Some(vec![
                 format!("echo {} | sudo -S iptables -L", remote_computer.password),
             ]),
@@ -375,5 +371,6 @@ impl<'a> EvidenceAcquirer<'a> {
         self.running_processes();
         self.event_logs();
         self.logged_users();
+        self.registry()
     }
 }

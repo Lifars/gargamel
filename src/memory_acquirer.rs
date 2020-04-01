@@ -1,8 +1,6 @@
-use crate::remote::{Connector, Computer, Command, PsExec, Local, PsRemote, RemoteCopier, Copier, XCopy, PsCopyItem, WindowsRemoteCopier};
-use std::path::{PathBuf, Path};
-use crate::arg_parser::Opts;
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, RemoteCopier, Copier, XCopy, PsCopyItem, WindowsRemoteCopier};
+use std::path::Path;
 use std::io;
-use crate::utils::Quoted;
 
 pub struct MemoryAcquirer<'a> {
     pub computer: &'a Computer,
@@ -58,7 +56,7 @@ impl<'a> MemoryAcquirer<'a> {
         let source_winpmem = std::env::current_dir()?.join(winpmem);
         let target_name = match target_name.parent() {
             None => Path::new("C:\\Users\\Public").join(target_name),
-            Some(parent) => target_name.to_owned(),
+            Some(_) => target_name.to_owned(),
         };
         let target_store = target_name.parent().unwrap();
         let target_winpmem = target_store.join(winpmem);
