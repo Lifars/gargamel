@@ -1,3 +1,5 @@
+extern crate rpassword;
+
 use std::io;
 use simplelog::{CombinedLogger, TermLogger, WriteLogger, Config, TerminalMode, LevelFilter};
 use std::fs::{File, create_dir_all};
@@ -11,10 +13,11 @@ extern crate simplelog;
 use clap::derive::Clap;
 use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::{Path, PathBuf};
-use crate::remote::{PsExec, PsRemote, Local, Computer, Copier, XCopy, PsCopyItem, RemoteCopier};
+use crate::remote::{PsExec, PsRemote, Local, Computer, Copier, XCopy, PsCopyItem, RemoteCopier, Scp, WindowsRemoteCopier, ScpRemoteCopier};
 use crate::memory_acquirer::MemoryAcquirer;
 use crate::command_runner::CommandRunner;
 use crate::file_acquirer::download_files;
+use rpassword::read_password;
 
 mod process_runner;
 mod evidence_acquirer;
@@ -76,12 +79,22 @@ fn main() -> Result<(), io::Error> {
 
     let opts: Opts = Opts::parse();
     create_dir_all(&opts.store_directory)?;
+
+    let opts = match &opts.password {
+        Some(_) => opts,
+        None => {
+            println!("Password: ");
+            let password = read_password().expect("Error reading password");
+            Opts { password: Some(password), ..opts }
+        }
+    };
+
     let remote_computer = Computer::from(opts.clone());
     let local_store_directory = Path::new(&opts.store_directory);
     let evidence_acquirers = create_evidence_acquirers(
         &remote_computer,
         local_store_directory,
-        &opts
+        &opts,
     );
     for acquirer in evidence_acquirers {
         acquirer.run_all();
@@ -90,7 +103,7 @@ fn main() -> Result<(), io::Error> {
         let memory_acquirers = create_memory_acquirers(
             &remote_computer,
             local_store_directory,
-            &opts
+            &opts,
         );
         let image_memory_remote_store = opts.image_memory.as_ref().unwrap();
         for acquirer in memory_acquirers {
@@ -105,7 +118,7 @@ fn main() -> Result<(), io::Error> {
         let command_runners = create_command_runners(
             &remote_computer,
             local_store_directory,
-            &opts
+            &opts,
         );
         for command_runner in command_runners {
             info!("Running commands using method {}", command_runner.connector.connect_method_name());
@@ -113,21 +126,32 @@ fn main() -> Result<(), io::Error> {
         }
     }
     if opts.search_files_path.is_some() {
-        let copiers = create_file_copiers(&opts);
         let search_files_path = opts.search_files_path.as_ref().unwrap();
         let search_files_path = Path::new(search_files_path);
-        for copier in copiers {
-            let remote_copier = RemoteCopier::new(
+        if opts.ssh {
+            let remote_copier = ScpRemoteCopier::new(
                 &remote_computer,
-                copier.as_ref()
             );
-            let result = download_files(
+            download_files(
                 search_files_path,
                 local_store_directory,
-                &remote_copier
-            );
-            if result.is_ok() {
-              break;
+                &remote_copier,
+            )?;
+        } else {
+            let copiers = create_windows_file_copiers(&opts, &remote_computer);
+            for copier in copiers {
+                let remote_copier = WindowsRemoteCopier::new(
+                    &remote_computer,
+                    copier.as_ref(),
+                );
+                let result = download_files(
+                    search_files_path,
+                    local_store_directory,
+                    &remote_copier,
+                );
+                if result.is_ok() {
+                    break;
+                }
             }
         }
     }
@@ -138,7 +162,7 @@ fn main() -> Result<(), io::Error> {
 fn create_evidence_acquirers<'a>(
     computer: &'a Computer,
     local_store_directory: &'a Path,
-    opts: &Opts
+    opts: &Opts,
 ) -> Vec<EvidenceAcquirer<'a>> {
     let acquirers: Vec<EvidenceAcquirer<'a>> = if opts.all {
         vec![
@@ -189,6 +213,14 @@ fn create_evidence_acquirers<'a>(
                 )
             )
         }
+        if opts.ssh {
+            acquirers.push(
+                EvidenceAcquirer::ssh(
+                    computer,
+                    local_store_directory,
+                )
+            )
+        }
         acquirers
     };
     acquirers
@@ -197,7 +229,7 @@ fn create_evidence_acquirers<'a>(
 fn create_memory_acquirers<'a>(
     computer: &'a Computer,
     local_store_directory: &'a Path,
-    opts: &Opts
+    opts: &Opts,
 ) -> Vec<MemoryAcquirer<'a>> {
     let acquirers: Vec<MemoryAcquirer<'a>> = if opts.all {
         vec![
@@ -244,7 +276,7 @@ fn create_memory_acquirers<'a>(
 fn create_command_runners<'a>(
     computer: &'a Computer,
     local_store_directory: &'a Path,
-    opts: &Opts
+    opts: &Opts,
 ) -> Vec<CommandRunner<'a>> {
     let acquirers: Vec<CommandRunner<'a>> = if opts.all {
         vec![
@@ -283,12 +315,20 @@ fn create_command_runners<'a>(
                 )
             )
         }
+        if opts.ssh {
+            acquirers.push(
+                CommandRunner::ssh(
+                    computer,
+                    local_store_directory,
+                )
+            )
+        }
         acquirers
     };
     acquirers
 }
 
-fn create_file_copiers(opts: &Opts) -> Vec<Box<dyn Copier>> {
+fn create_windows_file_copiers(opts: &Opts, computer: &Computer) -> Vec<Box<dyn Copier>> {
     let acquirers: Vec<Box<dyn Copier>> = if opts.all {
         vec![
             Box::new(XCopy {}),

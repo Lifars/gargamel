@@ -9,6 +9,11 @@ edition = "2018"
 opt-level = 'z'  # Optimize for size. Comment it to optimize for speed
 lto = true
 
+
+#[target.x86_64-pc-windows-gnu]
+#linker = "C:\\Users\\viliam\\scoop\\apps\\msys2\\current\\mingw64\\bin\\gcc.exe"
+#ar = "C:\\Users\\viliam\\scoop\\apps\\msys2\\current\\mingw64\\bin\\ar.exe"
+
 #[build]
 #rustflags = "-C target-cpu=native"
 
@@ -23,3 +28,4 @@ bytes = ""
 uuid = { version = "0.8", features = ["v4"] }
 dunce = "1.0.0"
 wait-timeout = "0.2.0"
+rpassword = "4.0.5"

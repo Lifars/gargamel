@@ -28,7 +28,7 @@ impl From<Opts> for Computer {
         Computer{
             address: opts.computer,
             username: opts.user,
-            password: opts.password
+            password: opts.password.unwrap()
         }
     }
 }

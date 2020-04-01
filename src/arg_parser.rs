@@ -23,7 +23,7 @@ pub struct Opts {
     long = "password",
     help = "Remote user name"
     )]
-    pub password: String,
+    pub password: Option<String>,
     #[clap(
     short = "o",
     long = "output",
@@ -68,5 +68,8 @@ pub struct Opts {
     help = "Optional: Memory dump name"
     )]
     pub image_memory: Option<String>,
+
+    #[clap(long = "key", help = "Optional: SSH private key file")]
+    pub ssh_key: Option<String>,
 }
 

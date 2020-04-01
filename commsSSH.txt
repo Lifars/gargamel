@@ -1,0 +1,5 @@
+# Commands to run
+# Examples:
+
+ifconfig
+:ssh who

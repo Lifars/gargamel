@@ -1,4 +1,4 @@
-use crate::remote::{Computer, Connector, Command, PsExec, WmiProcess, Local, PsRemote};
+use crate::remote::{Computer, Connector, Command, PsExec, WmiProcess, Local, PsRemote, Ssh};
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use crate::command_utils::parse_command;
@@ -52,6 +52,17 @@ impl<'a> CommandRunner<'a> {
             remote_computer,
             local_store_directory,
             connector: Box::new(PsRemote{})
+        }
+    }
+
+    pub fn ssh(
+        remote_computer: &'a Computer,
+        local_store_directory: &'a Path,
+    )-> CommandRunner<'a>{
+        CommandRunner{
+            remote_computer,
+            local_store_directory,
+            connector: Box::new(Ssh{})
         }
     }
 

@@ -7,7 +7,7 @@ use std::ffi::OsStr;
 
 pub fn download_files(file_list: &Path,
                       local_store_directory: &Path,
-                      downloader: &RemoteCopier,
+                      downloader: &dyn RemoteCopier,
 ) -> io::Result<()> {
     let input_file = File::open(file_list)?;
     for path_to_find in BufReader::new(input_file).lines() {

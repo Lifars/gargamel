@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::ops::Not;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -24,10 +24,38 @@ pub fn run_process_blocking(
     Ok(())
 }
 
+pub fn run_piped_processes_blocking(
+    command_name_first: &str,
+    command_args_first: &[String],
+    command_name_second: &str,
+    command_args_second: &[String],
+) -> Result<()> {
+    let mut first = Command::new(command_name_first);
+    if !command_args_first.is_empty() {
+        first.args(command_args_first);
+    }
+    let mut first = first.stdout(Stdio::piped())
+        .spawn()?;
+
+    if let Some(first_output) = first.stdout.take() {
+        let mut second = Command::new(command_name_second);
+        second.stdin(first_output);
+        if !command_args_second.is_empty() {
+            second.args(command_args_second);
+        }
+        let output = second.output()?;
+        trace!("Command {} output: {}", command_name_second, String::from_utf8_lossy(&output.stdout));
+        trace!("Command {} error: {}", command_name_second, String::from_utf8_lossy(&output.stderr));
+    } else {
+        trace!("Child not invoked")
+    }
+    Ok(())
+}
+
 pub fn run_process_blocking_timed(
     command_name: &str,
     command_args: &[String],
-    wait_for: Duration
+    wait_for: Duration,
 ) -> Result<()> {
     debug!("Starting process {}, with args: {:?}", command_name, command_args);
     let mut command = Command::new(command_name);

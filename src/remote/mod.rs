@@ -18,6 +18,10 @@ pub mod psremote;
 
 pub use self::psremote::*;
 
+pub mod ssh;
+
+pub use self::ssh::*;
+
 pub mod copier;
 
 pub use self::copier::*;

@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, PsExec, Local, PsRemote, RemoteCopier, Copier, XCopy, PsCopyItem};
+use crate::remote::{Connector, Computer, Command, PsExec, Local, PsRemote, RemoteCopier, Copier, XCopy, PsCopyItem, WindowsRemoteCopier};
 use std::path::{PathBuf, Path};
 use crate::arg_parser::Opts;
 use std::io;
@@ -62,10 +62,10 @@ impl<'a> MemoryAcquirer<'a> {
         };
         let target_store = target_name.parent().unwrap();
         let target_winpmem = target_store.join(winpmem);
-        let remote_copier = RemoteCopier{
-            computer: &self.computer,
-            copier_impl: self.copier.as_ref()
-        };
+        let remote_copier = WindowsRemoteCopier::new(
+            &self.computer,
+            self.copier.as_ref()
+        );
         remote_copier.copy_to_remote(
             &source_winpmem,
             &target_store,

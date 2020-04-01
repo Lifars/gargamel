@@ -1,7 +1,7 @@
 use std::io::{Result, Error};
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Wmi};
+use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Wmi, Ssh};
 use std::ffi::OsStr;
 use crate::command_utils::parse_command;
 use std::ops::Deref;
@@ -11,18 +11,18 @@ pub struct EvidenceAcquirer<'a> {
     store_directory: &'a Path,
     connector: Box<dyn Connector>,
 
-    firewall_state_command: Option<Vec<&'static str>>,
-    network_state_command: Option<Vec<&'static str>>,
-    logged_users_command: Option<Vec<&'static str>>,
-    running_processes_command: Option<Vec<&'static str>>,
-    active_network_connections_command: Option<Vec<&'static str>>,
-    registry_hklm_command: Option<Vec<&'static str>>,
-    registry_hkcu_command: Option<Vec<&'static str>>,
-    registry_hkcr_command: Option<Vec<&'static str>>,
-    registry_hku_command: Option<Vec<&'static str>>,
-    registry_hkcc_command: Option<Vec<&'static str>>,
-    system_event_logs_command: Option<Vec<&'static str>>,
-    application_event_logs_command: Option<Vec<&'static str>>,
+    firewall_state_command: Option<Vec<String>>,
+    network_state_command: Option<Vec<String>>,
+    logged_users_command: Option<Vec<String>>,
+    running_processes_command: Option<Vec<String>>,
+    active_network_connections_command: Option<Vec<String>>,
+    registry_hklm_command: Option<Vec<String>>,
+    registry_hkcu_command: Option<Vec<String>>,
+    registry_hkcr_command: Option<Vec<String>>,
+    registry_hku_command: Option<Vec<String>>,
+    registry_hkcc_command: Option<Vec<String>>,
+    system_event_logs_command: Option<Vec<String>>,
+    application_event_logs_command: Option<Vec<String>>,
 }
 
 impl<'a> EvidenceAcquirer<'a> {
@@ -36,61 +36,61 @@ impl<'a> EvidenceAcquirer<'a> {
             store_directory,
             connector: remote_connector,
             firewall_state_command: Some(vec![
-                "netsh",
-                "advfirewall",
-                "show",
-                "allprofiles",
-                "state",
+                "netsh".to_string(),
+                "advfirewall".to_string(),
+                "show".to_string(),
+                "allprofiles".to_string(),
+                "state".to_string(),
             ]),
             network_state_command: Some(vec![
-                "ipconfig",
-                "/all"
+                "ipconfig".to_string(),
+                "/all".to_string(),
             ]),
             logged_users_command: Some(vec![
-                "query",
-                "user"
+                "query".to_string(),
+                "user".to_string(),
             ]),
             running_processes_command: Some(vec![
-                "tasklist"
+                "tasklist".to_string(),
             ]),
             active_network_connections_command: Some(vec![
-                "netstat",
-                "-ano"
+                "netstat".to_string(),
+                "-ano".to_string(),
             ]),
             registry_hklm_command: Some(vec![
-                "reg",
-                "export",
-                "HKLM"
+                "reg".to_string(),
+                "export".to_string(),
+                "HKLM".to_string(),
             ]),
             registry_hkcu_command: Some(vec![
-                "reg",
-                "export",
-                "HKCU"
+                "reg".to_string(),
+                "export".to_string(),
+                "HKCU".to_string(),
             ]),
             registry_hkcr_command: Some(vec![
-                "reg",
-                "export",
-                "HKCR"
+                "reg".to_string(),
+                "export".to_string(),
+                "HKCR".to_string(),
             ]),
             registry_hku_command: Some(vec![
-                "reg",
-                "export",
-                "HKU"
+                "reg".to_string(),
+                "export".to_string(),
+                "HKU".to_string(),
             ]),
             registry_hkcc_command: Some(vec![
-                "reg",
-                "export",
-                "HKCC"
+                "reg".to_string(),
+                "export".to_string(),
+                "HKCC".to_string(),
             ]),
             system_event_logs_command: Some(vec![
-                "wevtutil",
-                "qe",
-                "system"
+                "wevtutil".to_string(),
+                "qe".to_string(),
+                "system".to_string(),
             ]),
             application_event_logs_command: Some(vec![
-                "wevtutil",
-                "qe",
-                "application"
+                "wevtutil".to_string(),
+                "qe".to_string(),
+                "application".to_string(),
             ]),
         }
     }
@@ -138,25 +138,25 @@ impl<'a> EvidenceAcquirer<'a> {
             connector: Box::new(Wmi{}),
             firewall_state_command: None,
             network_state_command: Some(vec![
-                "nic",
-                "get",
-                "AdapterType,",
-                "Name,",
-                "Installed,",
-                "MACAddress,",
-                "PowerManagementSupported,",
-                "Speed"
+                "nic".to_string(),
+                "get".to_string(),
+                "AdapterType,".to_string(),
+                "Name,".to_string(),
+                "Installed,".to_string(),
+                "MACAddress,".to_string(),
+                "PowerManagementSupported,".to_string(),
+                "Speed".to_string(),
             ]),
             logged_users_command: Some(vec![
-                "COMPUTERSYSTEM",
-                "GET",
-                "USERNAME"
+                "COMPUTERSYSTEM".to_string(),
+                "GET".to_string(),
+                "USERNAME".to_string(),
             ]),
             running_processes_command: Some(vec![
-                "process"
+                "process".to_string(),
             ]),
             active_network_connections_command: Some(vec![
-                "netuse"
+                "netuse".to_string(),
             ]),
             registry_hklm_command: None,
             registry_hkcu_command: None,
@@ -164,21 +164,56 @@ impl<'a> EvidenceAcquirer<'a> {
             registry_hku_command: None,
             registry_hkcc_command: None,
             system_event_logs_command: Some(vec![
-                "NTEVENT",
-                "WHERE",
-                "LogFile='system"
+                "NTEVENT".to_string(),
+                "WHERE".to_string(),
+                "LogFile='system".to_string(),
             ]),
             application_event_logs_command: Some(vec![
-                "NTEVENT",
-                "WHERE",
-                "LogFile='application"
+                "NTEVENT".to_string(),
+                "WHERE".to_string(),
+                "LogFile='application".to_string(),
+            ]),
+        }
+    }
+
+    pub fn ssh(
+        remote_computer: &'a Computer,
+        store_directory: &'a Path,
+    ) -> EvidenceAcquirer<'a> {
+        EvidenceAcquirer {
+            remote_computer,
+            store_directory,
+            connector: Box::new(Ssh{}),
+            firewall_state_command: Some(vec![
+                format!("echo {} | sudo -S iptables -L", remote_computer.password),
+            ]),
+            network_state_command: Some(vec![
+                "ifconfig".to_string(),
+            ]),
+            logged_users_command: Some(vec![
+                "who".to_string(),
+            ]),
+            running_processes_command: Some(vec![
+                "ps aux".to_string(),
+            ]),
+            active_network_connections_command: Some(vec![
+                "netstat -natp".to_string(),
+            ]),
+            registry_hklm_command: None,
+            registry_hkcu_command: None,
+            registry_hkcr_command: None,
+            registry_hku_command: None,
+            registry_hkcc_command: None,
+            system_event_logs_command: None,
+            application_event_logs_command: Some(vec![
+                "lsof".to_string(),
             ]),
         }
     }
 
     fn run(
         &self,
-        command: &[&str],
+        command: &[String],
         report_filename_prefix: &str,
     ) {
         if command.is_empty() {
@@ -186,7 +221,7 @@ impl<'a> EvidenceAcquirer<'a> {
         }
         let remote_connection = Command::new(
             &self.remote_computer,
-            command.iter().map(|it| it.to_string()).collect(),
+            command.to_vec(),
             Some(&self.store_directory),
             report_filename_prefix,
         );
