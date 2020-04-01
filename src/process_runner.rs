@@ -34,6 +34,7 @@ pub fn run_piped_processes_blocking(
     if !command_args_first.is_empty() {
         first.args(command_args_first);
     }
+    trace!("Running command \"{}\" with params {:?}", command_name_first, command_args_first);
     let mut first = first.stdout(Stdio::piped())
         .spawn()?;
 
@@ -43,6 +44,7 @@ pub fn run_piped_processes_blocking(
         if !command_args_second.is_empty() {
             second.args(command_args_second);
         }
+        trace!("Running command {} with params {:?}", command_name_second, command_args_second);
         let output = second.output()?;
         trace!("Command {} output: {}", command_name_second, String::from_utf8_lossy(&output.stdout));
         trace!("Command {} error: {}", command_name_second, String::from_utf8_lossy(&output.stderr));

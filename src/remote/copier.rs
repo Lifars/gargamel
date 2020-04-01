@@ -63,16 +63,20 @@ impl<'a> Copier for Scp<'a> {
         target: &Path,
     ) -> io::Result<()> {
         run_piped_processes_blocking(
-            "echo",
-            &["n".to_string()],
+            "cmd",
+            &[
+                "/c".to_string(),
+                "echo".to_string(),
+                "n".to_string()
+            ],
             "pscp.exe",
             &[
                 "-l".to_string(),
                 self.computer.username.clone(),
                 "-pw".to_string(),
                 self.computer.password.clone(),
-                format!("\"{}\"", source.to_string_lossy()),
-                format!("\"{}\"", target.to_string_lossy()),
+                format!("{}", source.to_string_lossy()),
+                format!("{}", target.to_string_lossy()),
             ],
         )
     }
