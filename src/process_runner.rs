@@ -3,6 +3,7 @@ use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::io::Result;
 use crate::remote::Computer;
+use std::fs::File;
 
 extern crate dunce;
 
@@ -12,6 +13,7 @@ pub fn run_process_blocking(
 ) -> Result<()> {
     debug!("Starting process {}, with args: {:?}", command_name, command_args);
     let mut command = Command::new(command_name);
+    // command.stdout(Stdio::null());
     if command_args.is_empty().not() {
         command.args(command_args);
     }
@@ -80,12 +82,18 @@ pub fn create_report_path(
     filename_prefix: &str,
     method_name: &str,
 ) -> PathBuf {
-    let address_formatted = remote_computer.address.replace(".", "_");
-    let filename = format!("{}_{}_{}_{}.txt",
+    let address_formatted = remote_computer.address.replace(".", "-");
+    let filename = format!("{}-{}-{}-{}.txt",
                            method_name,
                            filename_prefix,
                            address_formatted,
                            remote_computer.username
     );
-    store_directory.join(filename)
+    let file_path = store_directory.join(filename);
+    {
+        File::create(&file_path).expect(&format!("Cannot create file {}", file_path.display()));
+    }
+    let result = dunce::canonicalize(file_path).expect("Cannot canonicalize");
+    trace!("Report will be saved at {}", result.display());
+    result
 }

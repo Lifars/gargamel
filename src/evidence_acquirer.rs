@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Wmi, Ssh};
+use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Wmi, Ssh, Rdp};
 
 pub struct EvidenceAcquirer<'a> {
     remote_computer: &'a Computer,
@@ -11,11 +11,6 @@ pub struct EvidenceAcquirer<'a> {
     logged_users_command: Option<Vec<String>>,
     running_processes_command: Option<Vec<String>>,
     active_network_connections_command: Option<Vec<String>>,
-    registry_hklm_command: Option<Vec<String>>,
-    registry_hkcu_command: Option<Vec<String>>,
-    registry_hkcr_command: Option<Vec<String>>,
-    registry_hku_command: Option<Vec<String>>,
-    registry_hkcc_command: Option<Vec<String>>,
     system_event_logs_command: Option<Vec<String>>,
     application_event_logs_command: Option<Vec<String>>,
 }
@@ -51,31 +46,6 @@ impl<'a> EvidenceAcquirer<'a> {
             active_network_connections_command: Some(vec![
                 "netstat".to_string(),
                 "-ano".to_string(),
-            ]),
-            registry_hklm_command: Some(vec![
-                "reg".to_string(),
-                "export".to_string(),
-                "HKLM".to_string(),
-            ]),
-            registry_hkcu_command: Some(vec![
-                "reg".to_string(),
-                "export".to_string(),
-                "HKCU".to_string(),
-            ]),
-            registry_hkcr_command: Some(vec![
-                "reg".to_string(),
-                "export".to_string(),
-                "HKCR".to_string(),
-            ]),
-            registry_hku_command: Some(vec![
-                "reg".to_string(),
-                "export".to_string(),
-                "HKU".to_string(),
-            ]),
-            registry_hkcc_command: Some(vec![
-                "reg".to_string(),
-                "export".to_string(),
-                "HKCC".to_string(),
             ]),
             system_event_logs_command: Some(vec![
                 "wevtutil".to_string(),
@@ -119,7 +89,7 @@ impl<'a> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
             remote_computer,
             store_directory,
-            Box::new(Local {}),
+            Box::new(Local::new()),
         )
     }
 
@@ -153,11 +123,6 @@ impl<'a> EvidenceAcquirer<'a> {
             active_network_connections_command: Some(vec![
                 "netuse".to_string(),
             ]),
-            registry_hklm_command: None,
-            registry_hkcu_command: None,
-            registry_hkcr_command: None,
-            registry_hku_command: None,
-            registry_hkcc_command: None,
             system_event_logs_command: Some(vec![
                 "NTEVENT".to_string(),
                 "WHERE".to_string(),
@@ -169,6 +134,17 @@ impl<'a> EvidenceAcquirer<'a> {
                 "LogFile='application".to_string(),
             ]),
         }
+    }
+
+    pub fn rdp(
+        remote_computer: &'a Computer,
+        store_directory: &'a Path,
+    ) -> EvidenceAcquirer<'a> {
+        EvidenceAcquirer::new_standard_acquirer(
+            remote_computer,
+            store_directory,
+            Box::new(Rdp {}),
+        )
     }
 
     pub fn ssh(
@@ -195,11 +171,6 @@ impl<'a> EvidenceAcquirer<'a> {
             active_network_connections_command: Some(vec![
                 "netstat -natp".to_string(),
             ]),
-            registry_hklm_command: None,
-            registry_hkcu_command: None,
-            registry_hkcr_command: None,
-            registry_hku_command: None,
-            registry_hkcc_command: None,
             system_event_logs_command: None,
             application_event_logs_command: Some(vec![
                 "lsof".to_string(),
@@ -239,7 +210,7 @@ impl<'a> EvidenceAcquirer<'a> {
             Some(command) => {
                 self.run(
                     command,
-                    "firewall_status",
+                    "firewall-status",
                 )
             },
         }
@@ -251,7 +222,7 @@ impl<'a> EvidenceAcquirer<'a> {
             Some(command) => {
                 self.run(
                     command,
-                    "network_status",
+                    "network-status",
                 )
             },
         }
@@ -263,7 +234,7 @@ impl<'a> EvidenceAcquirer<'a> {
             Some(command) => {
                 self.run(
                     command,
-                    "logged_users",
+                    "logged-users",
                 )
             },
         }
@@ -275,7 +246,7 @@ impl<'a> EvidenceAcquirer<'a> {
             Some(command) => {
                 self.run(
                     command,
-                    "running_processes",
+                    "running-processes",
                 )
             },
         }
@@ -287,55 +258,7 @@ impl<'a> EvidenceAcquirer<'a> {
             Some(command) => {
                 self.run(
                     command,
-                    "active_network_connections",
-                )
-            },
-        }
-    }
-
-    pub fn registry(&self) {
-        match &self.registry_hklm_command {
-            None => {},
-            Some(command) => {
-                self.run(
-                    command,
-                    "registry_hklm",
-                )
-            },
-        }
-        match &self.registry_hkcu_command {
-            None => {},
-            Some(command) => {
-                self.run(
-                    command,
-                    "registry_hkcu",
-                )
-            },
-        }
-        match &self.registry_hku_command {
-            None => {},
-            Some(command) => {
-                self.run(
-                    command,
-                    "registry_hku",
-                )
-            },
-        }
-        match &self.registry_hkcr_command {
-            None => {},
-            Some(command) => {
-                self.run(
-                    command,
-                    "registry_hkcr",
-                )
-            },
-        }
-        match &self.registry_hkcc_command {
-            None => {},
-            Some(command) => {
-                self.run(
-                    command,
-                    "registry_hkcc",
+                    "active-network-connections",
                 )
             },
         }
@@ -347,7 +270,7 @@ impl<'a> EvidenceAcquirer<'a> {
             Some(command) => {
                 self.run(
                     command,
-                    "events_system",
+                    "events-system",
                 )
             },
         };
@@ -356,7 +279,7 @@ impl<'a> EvidenceAcquirer<'a> {
             Some(command) => {
                 self.run(
                     command,
-                    "events_application",
+                    "events-application",
                 )
             },
         };
@@ -371,6 +294,5 @@ impl<'a> EvidenceAcquirer<'a> {
         self.running_processes();
         self.event_logs();
         self.logged_users();
-        self.registry()
     }
 }

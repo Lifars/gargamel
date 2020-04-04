@@ -20,7 +20,9 @@ cargo build
 Make sure to have the following programs in *Path* or in the same directory as Gargamel.
 * `wmic`, should be by default on Windows
 * `paexec`, an open source alternative to PsExec, [download](https://www.poweradmin.com/paexec/)
-* `winpmem`, an open source memory image tool, [download](https://github.com/Velocidex/c-aff4/releases). 
+* `winpmem`, an open source memory image tool, [download](https://github.com/Velocidex/c-aff4/releases).
+* `plink` and `pscp`, an open source CLI SSH/SCP clients, [download](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)
+* `SharpRDP`, an open source command executor using RDP, [download](https://github.com/vildibald/SharpRDP/releases/tag/v1.0.0)  
 Download the newest executable and rename it to *winpmem.exe* 
 
 Run

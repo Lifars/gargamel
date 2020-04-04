@@ -1,12 +1,14 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, RemoteCopier, Copier, XCopy, PsCopyItem, WindowsRemoteCopier};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, RemoteCopier, XCopy, PsCopyItem, WindowsRemoteCopier, RdpCopy, Rdp};
 use std::path::Path;
-use std::io;
+use std::{io, thread};
+use std::time::Duration;
 
 pub struct MemoryAcquirer<'a> {
     pub computer: &'a Computer,
     pub local_store_directory: &'a Path,
     pub connector: Box<dyn Connector>,
-    pub copier: Box<dyn Copier>,
+    pub copier_factory: Box<dyn Fn(Computer) -> Box<dyn RemoteCopier>>,
+    pub manual_wait: Option<Duration>
 }
 
 impl<'a> MemoryAcquirer<'a> {
@@ -18,7 +20,12 @@ impl<'a> MemoryAcquirer<'a> {
             computer: remote_computer,
             local_store_directory,
             connector: Box::new(PsExec {}),
-            copier: Box::new(XCopy {}),
+            copier_factory: Box::new(|computer: Computer|
+                Box::new(WindowsRemoteCopier::new(
+                    computer,
+                    Box::new(XCopy {}),
+                ))),
+            manual_wait: None
         }
     }
 
@@ -41,7 +48,30 @@ impl<'a> MemoryAcquirer<'a> {
             computer: remote_computer,
             local_store_directory,
             connector: Box::new(PsRemote {}),
-            copier: Box::new(PsCopyItem {}),
+            copier_factory: Box::new(|computer: Computer|
+                Box::new(WindowsRemoteCopier::new(
+                    computer,
+                    Box::new(PsCopyItem {}),
+                ))
+            ),
+            manual_wait: None
+        }
+    }
+
+    pub fn rdp(
+        remote_computer: &'a Computer,
+        local_store_directory: &'a Path,
+    ) -> MemoryAcquirer<'a> {
+        MemoryAcquirer {
+            computer: remote_computer,
+            local_store_directory,
+            connector: Box::new(Rdp {}),
+            copier_factory: Box::new(|computer: Computer|
+                Box::new(RdpCopy {
+                    computer,
+                })
+            ),
+            manual_wait: Some(Duration::from_secs(60 * 5))
         }
     }
 
@@ -49,9 +79,6 @@ impl<'a> MemoryAcquirer<'a> {
         &self,
         target_name: &Path,
     ) -> io::Result<()> {
-        // self.run_command(target_store);
-        // self.extract_file()
-
         let winpmem = "winpmem.exe";
         let source_winpmem = std::env::current_dir()?.join(winpmem);
         let target_name = match target_name.parent() {
@@ -60,10 +87,7 @@ impl<'a> MemoryAcquirer<'a> {
         };
         let target_store = target_name.parent().unwrap();
         let target_winpmem = target_store.join(winpmem);
-        let remote_copier = WindowsRemoteCopier::new(
-            &self.computer,
-            self.copier.as_ref()
-        );
+        let remote_copier = self.copier_factory.as_ref()(self.computer.clone());
         remote_copier.copy_to_remote(
             &source_winpmem,
             &target_store,
@@ -82,6 +106,9 @@ impl<'a> MemoryAcquirer<'a> {
             report_filename_prefix: "mem-ack-log",
         };
         self.connector.connect_and_run_command(connection)?;
+        if self.manual_wait.is_some() {
+            thread::sleep(self.manual_wait.unwrap());
+        }
         remote_copier.copy_from_remote(
             &target_name,
             &self.local_store_directory,

@@ -51,12 +51,38 @@ impl Copier for PsCopyItem {
     }
 }
 
-pub struct Scp<'a> {
-    pub computer: &'a Computer,
-    pub key_file: Option<&'a Path>,
+pub struct RdpCopy {
+    pub computer: Computer,
 }
 
-impl<'a> Copier for Scp<'a> {
+impl Copier for RdpCopy {
+    fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
+        let args = vec![
+            format!("computername={}", &self.computer.address),
+            format!("username={}", &self.computer.username),
+            format!("password={}", &self.computer.password),
+            "exec=cmd".to_string(),
+            "takeover=true".to_string(),
+            "connectdrive=true".to_string(),
+            format!(
+                "command=xcopy {} {} /y",
+                source.to_string_lossy(),
+                target.to_string_lossy()
+            )
+        ];
+        run_process_blocking(
+            "SharpRDP.exe",
+            &args,
+        )
+    }
+}
+
+pub struct Scp {
+    pub computer: Computer,
+    pub key_file: Option<PathBuf>,
+}
+
+impl Copier for Scp {
     fn copy_file(
         &self,
         source: &Path,
@@ -70,7 +96,7 @@ impl<'a> Copier for Scp<'a> {
         ];
         if self.key_file.is_some() {
             scp.push("-i".to_string());
-            scp.push(self.key_file.unwrap().to_string_lossy().to_string())
+            scp.push(self.key_file.as_ref().unwrap().to_string_lossy().to_string())
         }
         scp.push(format!("{}", source.to_string_lossy()));
         scp.push(format!("{}", target.to_string_lossy()));
@@ -114,12 +140,12 @@ pub trait RemoteCopier {
 }
 
 /// Use factory mathods to properly initialize the struct.
-pub struct WindowsRemoteCopier<'a> {
-    computer: &'a Computer,
-    copier_impl: &'a dyn Copier,
+pub struct WindowsRemoteCopier {
+    computer: Computer,
+    copier_impl: Box<dyn Copier>,
 }
 
-impl<'a> Drop for WindowsRemoteCopier<'a> {
+impl Drop for WindowsRemoteCopier {
     fn drop(&mut self) {
         run_process_blocking(
             "NET",
@@ -135,11 +161,11 @@ impl<'a> Drop for WindowsRemoteCopier<'a> {
     }
 }
 
-impl<'a> WindowsRemoteCopier<'a> {
+impl WindowsRemoteCopier {
     pub fn new(
-        computer: &'a Computer,
-        implementation: &'a dyn Copier,
-    ) -> WindowsRemoteCopier<'a> {
+        computer: Computer,
+        copier_impl: Box<dyn Copier>,
+    ) -> WindowsRemoteCopier {
         run_process_blocking(
             "NET",
             &[
@@ -151,17 +177,17 @@ impl<'a> WindowsRemoteCopier<'a> {
         ).expect(&format!(
             "Cannot establish connection using \"net use\" to {}", &computer.address
         ));
-        WindowsRemoteCopier { computer, copier_impl: implementation }
+        WindowsRemoteCopier { computer, copier_impl }
     }
 }
 
-impl<'a> RemoteCopier for WindowsRemoteCopier<'a> {
+impl RemoteCopier for WindowsRemoteCopier {
     fn computer(&self) -> &Computer {
-        self.computer
+        &self.computer
     }
 
     fn copier_impl(&self) -> &dyn Copier {
-        self.copier_impl
+        self.copier_impl.as_ref()
     }
 
     fn path_to_remote_form(
@@ -176,31 +202,13 @@ impl<'a> RemoteCopier for WindowsRemoteCopier<'a> {
     }
 }
 
-pub struct ScpRemoteCopier<'a> {
-    copier_impl: Scp<'a>,
-}
-
-impl<'a> ScpRemoteCopier<'a> {
-    pub fn new(
-        computer: &'a Computer,
-        key_file: Option<&'a Path>
-    ) -> ScpRemoteCopier<'a> {
-        ScpRemoteCopier {
-            copier_impl: Scp {
-                computer,
-                key_file
-            }
-        }
-    }
-}
-
-impl<'a> RemoteCopier for ScpRemoteCopier<'a> {
+impl RemoteCopier for Scp {
     fn computer(&self) -> &Computer {
-        self.copier_impl.computer
+        &self.computer
     }
 
     fn copier_impl(&self) -> &dyn Copier {
-        &self.copier_impl
+        self as &dyn Copier
     }
 
     fn path_to_remote_form(&self, path: &Path) -> PathBuf {
@@ -209,6 +217,42 @@ impl<'a> RemoteCopier for ScpRemoteCopier<'a> {
             self.computer().address,
             path.to_str().unwrap()
         ))
+    }
+}
+
+impl RemoteCopier for RdpCopy{
+    fn computer(&self) -> &Computer {
+        &self.computer
+    }
+
+    fn copier_impl(&self) -> &dyn Copier {
+        self as &dyn Copier
+    }
+
+    fn path_to_remote_form(&self, path: &Path) -> PathBuf {
+        trace!("Converting path {}", path.display());
+        // let canon_path = dunce::canonicalize(path).unwrap();
+        let as_remote_path = path
+            .to_string_lossy()
+            .replacen(":", "", 1);
+        let tsclient_path = format!("\\\\tsclient\\{}", as_remote_path);
+        PathBuf::from(tsclient_path)
+    }
+
+    fn copy_to_remote(
+        &self,
+        source: &Path,
+        target: &Path,
+    ) -> io::Result<()> {
+        self.copier_impl().copy_file(&self.path_to_remote_form(source), target)
+    }
+
+    fn copy_from_remote(
+        &self,
+        source: &Path,
+        target: &Path,
+    ) -> io::Result<()> {
+        self.copier_impl().copy_file(source, &self.path_to_remote_form(target))
     }
 }
 

@@ -22,6 +22,10 @@ pub mod ssh;
 
 pub use self::ssh::*;
 
+pub mod rdp;
+
+pub use self::rdp::*;
+
 pub mod copier;
 
 pub use self::copier::*;

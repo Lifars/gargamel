@@ -5,6 +5,7 @@ use std::path::Path;
 use std::fs::File;
 use crate::arg_parser::Opts;
 
+#[derive(Clone)]
 pub struct Computer {
     pub address: String,
     pub username: String,
@@ -69,10 +70,7 @@ pub trait Connector {
                     &remote_connection.report_filename_prefix,
                     self.connect_method_name(),
                 );
-                {
-                    File::create(&file_path)?;
-                }
-                Some(dunce::canonicalize(file_path)?.to_str().unwrap().to_string())
+                Some(file_path.to_str().unwrap().to_string())
             }
         };
 

@@ -39,3 +39,6 @@ For Linux
 
 
 
+
+
+SharpRDP.exe computername=192.168.126.150 command="ipconfig" username=IEUser password=trolko exec=cmd takeover=true

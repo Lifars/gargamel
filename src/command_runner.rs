@@ -1,4 +1,4 @@
-use crate::remote::{Computer, Connector, Command, PsExec, WmiProcess, Local, PsRemote, Ssh};
+use crate::remote::{Computer, Connector, Command, PsExec, WmiProcess, Local, PsRemote, Ssh, Rdp};
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use crate::command_utils::parse_command;
@@ -43,7 +43,7 @@ impl<'a> CommandRunner<'a> {
         CommandRunner{
             remote_computer,
             local_store_directory,
-            connector: Box::new(Local{}),
+            connector: Box::new(Local::new()),
             run_implicit: true
         }
     }
@@ -56,6 +56,18 @@ impl<'a> CommandRunner<'a> {
             remote_computer,
             local_store_directory,
             connector: Box::new(PsRemote{}),
+            run_implicit: true
+        }
+    }
+
+    pub fn rdp(
+        remote_computer: &'a Computer,
+        local_store_directory: &'a Path,
+    )-> CommandRunner<'a>{
+        CommandRunner{
+            remote_computer,
+            local_store_directory,
+            connector: Box::new(Rdp{}),
             run_implicit: true
         }
     }
@@ -122,7 +134,7 @@ impl<'a> CommandRunner<'a> {
                 .replace("/", "")
                 .replace("\\", "")
                 .replace(":", "-");
-            let report_filename_prefix = format!("custom_{}", command_joined);
+            let report_filename_prefix = format!("custom-{}", command_joined);
 
             let remote_connection = Command::new(
                 &self.remote_computer,

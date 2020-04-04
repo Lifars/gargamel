@@ -13,11 +13,12 @@ extern crate simplelog;
 use clap::derive::Clap;
 use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Copier, XCopy, PsCopyItem, WindowsRemoteCopier, ScpRemoteCopier};
+use crate::remote::{Computer, Copier, XCopy, PsCopyItem, WindowsRemoteCopier, Scp, RdpCopy};
 use crate::memory_acquirer::MemoryAcquirer;
 use crate::command_runner::CommandRunner;
 use crate::file_acquirer::download_files;
 use rpassword::read_password;
+use crate::registry_acquirer::RegistryAcquirer;
 
 mod process_runner;
 mod evidence_acquirer;
@@ -28,6 +29,7 @@ mod memory_acquirer;
 mod command_utils;
 mod utils;
 mod file_acquirer;
+mod registry_acquirer;
 mod command_runner;
 
 fn setup_logger() {
@@ -96,10 +98,78 @@ fn main() -> Result<(), io::Error> {
         &remote_computer,
         local_store_directory,
         &opts,
-        key_file.as_ref().map(|it| it.to_path_buf())
+        key_file.as_ref().map(|it| it.to_path_buf()),
     );
     for acquirer in evidence_acquirers {
         acquirer.run_all();
+    }
+    let registry_acquirers = create_registry_acquirers(
+        &remote_computer,
+        local_store_directory,
+        &opts,
+    );
+    for acquirer in registry_acquirers {
+        acquirer.acquire();
+    }
+    if opts.custom_command_path.is_some() {
+        let command_runners = create_command_runners(
+            &remote_computer,
+            local_store_directory,
+            &opts,
+            key_file.as_ref().map(|it| it.to_path_buf()),
+        );
+        for command_runner in command_runners {
+            info!("Running commands using method {}", command_runner.connector.connect_method_name());
+            command_runner.run_commands(Path::new(opts.custom_command_path.as_ref().unwrap()));
+        }
+    }
+    if opts.search_files_path.is_some() {
+        let search_files_path = opts.search_files_path.as_ref().unwrap();
+        let search_files_path = Path::new(search_files_path);
+        if opts.ssh {
+            let remote_copier = Scp {
+                computer: remote_computer.clone(),
+                key_file: key_file.as_ref().map(|it| it.clone()),
+            };
+            download_files(
+                search_files_path,
+                local_store_directory,
+                &remote_copier,
+            )?;
+        } else {
+            let copiers = create_windows_non_rdp_file_copiers(&opts);
+            let mut non_rdp_success = false;
+            for copier in copiers.into_iter() {
+                let remote_copier = WindowsRemoteCopier::new(
+                    remote_computer.clone(),
+                    copier,
+                );
+                let result = download_files(
+                    search_files_path,
+                    local_store_directory,
+                    &remote_copier,
+                );
+                if result.is_ok() {
+                    info!("Files in {} successfully transferred.", search_files_path.display());
+                    non_rdp_success = true;
+                    break;
+                }
+            }
+            if non_rdp_success && (opts.rdp || opts.all) {
+                let remote_copier = RdpCopy{
+                    computer: remote_computer.clone()
+                };
+                let result = download_files(
+                    search_files_path,
+                    local_store_directory,
+                    &remote_copier,
+                );
+                if result.is_ok() {
+                    info!("Files in {} successfully transferred.", search_files_path.display());
+                }
+            }
+
+        }
     }
     if opts.image_memory.is_some() {
         let memory_acquirers = create_memory_acquirers(
@@ -116,49 +186,6 @@ fn main() -> Result<(), io::Error> {
             }
         }
     }
-    if opts.custom_command_path.is_some() {
-        let command_runners = create_command_runners(
-            &remote_computer,
-            local_store_directory,
-            &opts,
-            key_file.as_ref().map(|it| it.to_path_buf())
-        );
-        for command_runner in command_runners {
-            info!("Running commands using method {}", command_runner.connector.connect_method_name());
-            command_runner.run_commands(Path::new(opts.custom_command_path.as_ref().unwrap()));
-        }
-    }
-    if opts.search_files_path.is_some() {
-        let search_files_path = opts.search_files_path.as_ref().unwrap();
-        let search_files_path = Path::new(search_files_path);
-        if opts.ssh {
-            let remote_copier = ScpRemoteCopier::new(
-                &remote_computer,
-                key_file.as_ref().map(|it| it.as_path())
-            );
-            download_files(
-                search_files_path,
-                local_store_directory,
-                &remote_copier,
-            )?;
-        } else {
-            let copiers = create_windows_file_copiers(&opts);
-            for copier in copiers {
-                let remote_copier = WindowsRemoteCopier::new(
-                    &remote_computer,
-                    copier.as_ref(),
-                );
-                let result = download_files(
-                    search_files_path,
-                    local_store_directory,
-                    &remote_copier,
-                );
-                if result.is_ok() {
-                    break;
-                }
-            }
-        }
-    }
 
     Ok(())
 }
@@ -167,7 +194,7 @@ fn create_evidence_acquirers<'a>(
     computer: &'a Computer,
     local_store_directory: &'a Path,
     opts: &Opts,
-    key_file: Option<PathBuf>
+    key_file: Option<PathBuf>,
 ) -> Vec<EvidenceAcquirer<'a>> {
     let acquirers: Vec<EvidenceAcquirer<'a>> = if opts.all {
         vec![
@@ -182,7 +209,11 @@ fn create_evidence_acquirers<'a>(
             EvidenceAcquirer::psremote(
                 computer,
                 local_store_directory,
-            )
+            ),
+            EvidenceAcquirer::rdp(
+                computer,
+                local_store_directory,
+            ),
         ]
     } else {
         let mut acquirers = Vec::<EvidenceAcquirer<'a>>::new();
@@ -223,8 +254,16 @@ fn create_evidence_acquirers<'a>(
                 EvidenceAcquirer::ssh(
                     computer,
                     local_store_directory,
-                    key_file
+                    key_file,
                 )
+            )
+        }
+        if opts.rdp {
+            acquirers.push(
+                EvidenceAcquirer::rdp(
+                    computer,
+                    local_store_directory,
+                ),
             )
         }
         acquirers
@@ -247,6 +286,10 @@ fn create_memory_acquirers<'a>(
                 computer,
                 local_store_directory,
             ),
+            MemoryAcquirer::rdp(
+                computer,
+                local_store_directory,
+            ),
         ]
     } else {
         let mut acquirers = Vec::<MemoryAcquirer>::new();
@@ -266,14 +309,14 @@ fn create_memory_acquirers<'a>(
                 )
             );
         }
-        // if opts.local {
-        //     acquirers.push(
-        //         MemoryAcquirer::local(
-        //             Computer::from(opts.clone()),
-        //             PathBuf::from(opts.store_directory.clone())
-        //         )
-        //     )
-        // }
+        if opts.rdp {
+            acquirers.push(
+                MemoryAcquirer::rdp(
+                    computer,
+                    local_store_directory,
+                )
+            );
+        }
         acquirers
     };
     acquirers
@@ -283,7 +326,7 @@ fn create_command_runners<'a>(
     computer: &'a Computer,
     local_store_directory: &'a Path,
     opts: &Opts,
-    key_file: Option<PathBuf>
+    key_file: Option<PathBuf>,
 ) -> Vec<CommandRunner<'a>> {
     let acquirers: Vec<CommandRunner<'a>> = if opts.all {
         vec![
@@ -327,7 +370,7 @@ fn create_command_runners<'a>(
                 CommandRunner::ssh(
                     computer,
                     local_store_directory,
-                    key_file
+                    key_file,
                 )
             )
         }
@@ -339,12 +382,71 @@ fn create_command_runners<'a>(
                 )
             )
         }
+        if opts.rdp {
+            acquirers.push(
+                CommandRunner::rdp(
+                    computer,
+                    local_store_directory,
+                )
+            )
+        }
         acquirers
     };
     acquirers
 }
 
-fn create_windows_file_copiers(opts: &Opts) -> Vec<Box<dyn Copier>> {
+fn create_registry_acquirers<'a>(
+    computer: &'a Computer,
+    local_store_directory: &'a Path,
+    opts: &Opts,
+) -> Vec<RegistryAcquirer<'a>> {
+    let acquirers: Vec<RegistryAcquirer<'a>> = if opts.all {
+        vec![
+            RegistryAcquirer::psexec(
+                computer,
+                local_store_directory,
+            ),
+            RegistryAcquirer::psremote(
+                computer,
+                local_store_directory,
+            ),
+            RegistryAcquirer::rdp(
+                computer,
+                local_store_directory,
+            ),
+        ]
+    } else {
+        let mut acquirers = Vec::<RegistryAcquirer<'a>>::new();
+        if opts.psexec {
+            acquirers.push(
+                RegistryAcquirer::psexec(
+                    computer,
+                    local_store_directory,
+                ),
+            );
+        }
+        if opts.psrem {
+            acquirers.push(
+                RegistryAcquirer::psremote(
+                    computer,
+                    local_store_directory,
+                )
+            );
+        }
+        if opts.rdp {
+            acquirers.push(
+                RegistryAcquirer::rdp(
+                    computer,
+                    local_store_directory,
+                ),
+            )
+        }
+        acquirers
+    };
+    acquirers
+}
+
+fn create_windows_non_rdp_file_copiers(opts: &Opts) -> Vec<Box<dyn Copier>> {
     let acquirers: Vec<Box<dyn Copier>> = if opts.all {
         vec![
             Box::new(XCopy {}),
