@@ -1,6 +1,5 @@
 use crate::remote::{Connector, Computer, Copier, XCopy, RemoteCopier};
 use std::path::{Path, PathBuf};
-use std::io::Error;
 use std::io;
 
 pub struct Local {
@@ -37,6 +36,15 @@ impl Copier for Local {
     fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
         let xcopy = XCopy {};
         xcopy.copy_file(source, target)
+    }
+
+    fn delete_file(&self, target: &Path) -> io::Result<()> {
+        let xcopy = XCopy {};
+        xcopy.delete_file(target)
+    }
+
+    fn method_name(&self) -> &'static str {
+        "XCopy (local)"
     }
 }
 

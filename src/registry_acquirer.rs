@@ -1,8 +1,6 @@
-use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Wmi, Ssh, Rdp, Copier, RemoteCopier, XCopy, PsCopyItem, WindowsRemoteCopier, RdpCopy};
-use uuid::Uuid;
+use std::path::Path;
+use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Rdp, RemoteCopier, XCopy, PsCopy, WindowsRemoteCopier, RdpCopy};
 use crate::process_runner::create_report_path;
-use std::io::Error;
 use std::thread;
 use std::time::Duration;
 
@@ -86,11 +84,12 @@ impl<'a> RegistryAcquirer<'a> {
             Box::new(PsRemote {}),
             Box::new(WindowsRemoteCopier::new(
                 remote_computer.clone(),
-                Box::new(PsCopyItem {}),
+                Box::new(PsCopy {}),
             )),
         )
     }
 
+    #[allow(dead_code)]
     pub fn local(
         remote_computer: &'a Computer,
         store_directory: &'a Path,
@@ -143,7 +142,7 @@ impl<'a> RegistryAcquirer<'a> {
 
         info!("{}: Checking {}",
               self.connector.connect_method_name(),
-              report_filename_prefix.replace("_", " ")
+              report_filename_prefix.replace("-", " ")
         );
 
         match self.connector.connect_and_run_command(remote_connection) {
@@ -156,14 +155,26 @@ impl<'a> RegistryAcquirer<'a> {
                 )
             }
         }
-        thread::sleep(Duration::from_millis(1500));
+        thread::sleep(Duration::from_millis(10_000));
         match self.copier.copy_from_remote(Path::new(&remote_report_path), report_path.parent().unwrap()) {
             Ok(_) => {}
             Err(err) => {
-                error!("Cannot download {} report from {} using method {}",
+                error!("Cannot download {} report from {} using method {} due to {}",
                        report_filename_prefix,
                        self.remote_computer.address,
-                       self.connector.connect_method_name()
+                       self.connector.connect_method_name(),
+                       err
+                )
+            }
+        }
+        thread::sleep(Duration::from_millis(1_000));
+        match self.copier.delete_remote_file(Path::new(&remote_report_path)) {
+            Ok(_) => {}
+            Err(err) => {
+                error!("Cannot delete remote file {} using method {} due to: {}",
+                       report_filename_prefix,
+                       self.connector.connect_method_name(),
+                       err
                 )
             }
         }

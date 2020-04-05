@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, RemoteCopier, XCopy, PsCopyItem, WindowsRemoteCopier, RdpCopy, Rdp};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, RemoteCopier, XCopy, PsCopy, WindowsRemoteCopier, RdpCopy, Rdp};
 use std::path::Path;
 use std::{io, thread};
 use std::time::Duration;
@@ -51,7 +51,7 @@ impl<'a> MemoryAcquirer<'a> {
             copier_factory: Box::new(|computer: Computer|
                 Box::new(WindowsRemoteCopier::new(
                     computer,
-                    Box::new(PsCopyItem {}),
+                    Box::new(PsCopy {}),
                 ))
             ),
             manual_wait: None
@@ -61,6 +61,7 @@ impl<'a> MemoryAcquirer<'a> {
     pub fn rdp(
         remote_computer: &'a Computer,
         local_store_directory: &'a Path,
+        manual_wait: Duration
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             computer: remote_computer,
@@ -71,7 +72,7 @@ impl<'a> MemoryAcquirer<'a> {
                     computer,
                 })
             ),
-            manual_wait: Some(Duration::from_secs(60 * 5))
+            manual_wait: Some(manual_wait)
         }
     }
 
@@ -79,6 +80,9 @@ impl<'a> MemoryAcquirer<'a> {
         &self,
         target_name: &Path,
     ) -> io::Result<()> {
+        let local_store_directory = std::env::current_dir()
+            .expect("Cannot open current working directory")
+            .join(self.local_store_directory);
         let winpmem = "winpmem.exe";
         let source_winpmem = std::env::current_dir()?.join(winpmem);
         let target_name = match target_name.parent() {
@@ -99,6 +103,7 @@ impl<'a> MemoryAcquirer<'a> {
                 target_winpmem.to_string_lossy().to_string(),
                 "--format".to_string(),
                 "map".to_string(),
+                "-t".to_string(),
                 "-o".to_string(),
                 target_name.to_string_lossy().to_string(),
             ],
@@ -109,12 +114,43 @@ impl<'a> MemoryAcquirer<'a> {
         if self.manual_wait.is_some() {
             thread::sleep(self.manual_wait.unwrap());
         }
-        remote_copier.copy_from_remote(
+        match remote_copier.copy_from_remote(
             &target_name,
-            &self.local_store_directory,
+            &local_store_directory,
             // &self.local_store_directory.join(target_name.file_name().unwrap()),
-        )
+        ){
+            Ok(_) => {}
+            Err(err) => {
+                error!("Cannot download {} report from {} using method {} due to {}",
+                       target_name.display(),
+                       self.computer.address,
+                       self.connector.connect_method_name(),
+                       err
+                )
+            }
+        }
+        thread::sleep(Duration::from_millis(1000));
+        match remote_copier.delete_remote_file(&target_winpmem) {
+            Ok(_) => {}
+            Err(err) => {
+                error!("Cannot delete remote file {} using method {} due to {}",
+                       target_name.display(),
+                       self.connector.connect_method_name(),
+                       err
+                )
+            }
+        };
+        thread::sleep(Duration::from_millis(1000));
+        match remote_copier.delete_remote_file(&target_name) {
+            Ok(_) => {}
+            Err(err) => {
+                error!("Cannot delete remote file {} using method {} due to {}",
+                       target_name.display(),
+                       self.connector.connect_method_name(),
+                       err
+                )
+            }
+        };
+        Ok(())
     }
 }
-
-

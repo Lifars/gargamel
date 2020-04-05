@@ -2,7 +2,6 @@ use std::io::Result;
 use crate::process_runner::{run_process_blocking, create_report_path};
 use std::iter;
 use std::path::Path;
-use std::fs::File;
 use crate::arg_parser::Opts;
 
 #[derive(Clone)]

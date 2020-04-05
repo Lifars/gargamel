@@ -1,4 +1,7 @@
-use crate::remote::{Connector, Computer};
+use crate::remote::{Connector, Computer, Copier};
+use std::path::Path;
+use std::io;
+use crate::process_runner::run_process_blocking;
 
 pub struct PsRemote {}
 
@@ -42,5 +45,41 @@ impl Connector for PsRemote {
                     output_file_path
                 ].into_iter()).collect(),
         }
+    }
+}
+
+pub struct PsCopy {}
+
+impl Copier for PsCopy {
+    fn copy_file(
+        &self,
+        source: &Path,
+        target: &Path,
+    ) -> io::Result<()> {
+        let args = vec![
+            "Copy-Item".to_string(),
+            format!("'{}'", source.to_string_lossy()),
+            format!("'{}'", target.to_string_lossy()),
+        ];
+        run_process_blocking(
+            "powershell.exe",
+            &args,
+        )
+    }
+
+    fn delete_file(&self, target: &Path) -> io::Result<()> {
+        let args = vec![
+            "Remove-Item".to_string(),
+            "-Force".to_string(),
+            format!("'{}'", target.to_string_lossy()),
+        ];
+        run_process_blocking(
+            "powershell.exe",
+            &args,
+        )
+    }
+
+    fn method_name(&self) -> &'static str {
+        "PowerShell"
     }
 }

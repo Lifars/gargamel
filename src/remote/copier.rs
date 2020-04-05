@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use crate::remote::Computer;
 use std::io;
-use crate::process_runner::{run_process_blocking, run_piped_processes_blocking};
+use crate::process_runner::run_process_blocking;
 
 pub trait Copier {
     fn copy_file(
@@ -9,6 +9,12 @@ pub trait Copier {
         source: &Path,
         target: &Path,
     ) -> io::Result<()>;
+
+    fn delete_file(&self,
+                   target: &Path,
+    ) -> io::Result<()>;
+
+    fn method_name(&self) -> &'static str;
 }
 
 pub struct XCopy {}
@@ -20,96 +26,31 @@ impl Copier for XCopy {
         target: &Path,
     ) -> io::Result<()> {
         let args = vec![
+            "/y".to_string(),
+            "/i".to_string(),
+            "/c".to_string(),
             source.to_string_lossy().to_string(),
             target.to_string_lossy().to_string(),
-            "/y".to_string()
         ];
         run_process_blocking(
             "xcopy",
             &args,
         )
     }
-}
 
-pub struct PsCopyItem {}
-
-impl Copier for PsCopyItem {
-    fn copy_file(
-        &self,
-        source: &Path,
-        target: &Path,
-    ) -> io::Result<()> {
+    fn delete_file(&self, target: &Path) -> io::Result<()> {
         let args = vec![
-            "Copy-Item".to_string(),
-            format!("'{}'", source.to_string_lossy()),
-            format!("'{}'", target.to_string_lossy()),
+            "/f".to_string(),
+            target.to_string_lossy().to_string(),
         ];
         run_process_blocking(
-            "powershell.exe",
+            "del",
             &args,
         )
     }
-}
 
-pub struct RdpCopy {
-    pub computer: Computer,
-}
-
-impl Copier for RdpCopy {
-    fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
-        let args = vec![
-            format!("computername={}", &self.computer.address),
-            format!("username={}", &self.computer.username),
-            format!("password={}", &self.computer.password),
-            "exec=cmd".to_string(),
-            "takeover=true".to_string(),
-            "connectdrive=true".to_string(),
-            format!(
-                "command=xcopy {} {} /y",
-                source.to_string_lossy(),
-                target.to_string_lossy()
-            )
-        ];
-        run_process_blocking(
-            "SharpRDP.exe",
-            &args,
-        )
-    }
-}
-
-pub struct Scp {
-    pub computer: Computer,
-    pub key_file: Option<PathBuf>,
-}
-
-impl Copier for Scp {
-    fn copy_file(
-        &self,
-        source: &Path,
-        target: &Path,
-    ) -> io::Result<()> {
-        let mut scp = vec![
-            "-l".to_string(),
-            self.computer.username.clone(),
-            "-pw".to_string(),
-            self.computer.password.clone(),
-        ];
-        if self.key_file.is_some() {
-            scp.push("-i".to_string());
-            scp.push(self.key_file.as_ref().unwrap().to_string_lossy().to_string())
-        }
-        scp.push(format!("{}", source.to_string_lossy()));
-        scp.push(format!("{}", target.to_string_lossy()));
-        run_piped_processes_blocking(
-            "cmd",
-            &[
-                "/c".to_string(),
-                "echo".to_string(),
-                "n".to_string()
-            ],
-            "pscp.exe",
-            &scp,
-        )
+    fn method_name(&self) -> &'static str {
+        "XCopy"
     }
 }
 
@@ -128,6 +69,10 @@ pub trait RemoteCopier {
         target: &Path,
     ) -> io::Result<()> {
         self.copier_impl().copy_file(source, &self.path_to_remote_form(target))
+    }
+
+    fn delete_remote_file(&self, target: &Path) -> io::Result<()> {
+        self.copier_impl().delete_file(&self.path_to_remote_form(target))
     }
 
     fn copy_from_remote(
@@ -170,7 +115,7 @@ impl WindowsRemoteCopier {
             "NET",
             &[
                 "USE".to_string(),
-                format!("\\\\{}\\IPC$", computer.address),
+                format!("\\\\{}", computer.address),
                 format!("/u:{}", computer.username),
                 format!("{}", computer.password),
             ],
@@ -199,60 +144,6 @@ impl RemoteCopier for WindowsRemoteCopier {
             self.computer().address,
             path.to_str().unwrap().replacen(":", "$", 1)
         ))
-    }
-}
-
-impl RemoteCopier for Scp {
-    fn computer(&self) -> &Computer {
-        &self.computer
-    }
-
-    fn copier_impl(&self) -> &dyn Copier {
-        self as &dyn Copier
-    }
-
-    fn path_to_remote_form(&self, path: &Path) -> PathBuf {
-        PathBuf::from(format!(
-            "{}:{}",
-            self.computer().address,
-            path.to_str().unwrap()
-        ))
-    }
-}
-
-impl RemoteCopier for RdpCopy{
-    fn computer(&self) -> &Computer {
-        &self.computer
-    }
-
-    fn copier_impl(&self) -> &dyn Copier {
-        self as &dyn Copier
-    }
-
-    fn path_to_remote_form(&self, path: &Path) -> PathBuf {
-        trace!("Converting path {}", path.display());
-        // let canon_path = dunce::canonicalize(path).unwrap();
-        let as_remote_path = path
-            .to_string_lossy()
-            .replacen(":", "", 1);
-        let tsclient_path = format!("\\\\tsclient\\{}", as_remote_path);
-        PathBuf::from(tsclient_path)
-    }
-
-    fn copy_to_remote(
-        &self,
-        source: &Path,
-        target: &Path,
-    ) -> io::Result<()> {
-        self.copier_impl().copy_file(&self.path_to_remote_form(source), target)
-    }
-
-    fn copy_from_remote(
-        &self,
-        source: &Path,
-        target: &Path,
-    ) -> io::Result<()> {
-        self.copier_impl().copy_file(source, &self.path_to_remote_form(target))
     }
 }
 

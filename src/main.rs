@@ -13,12 +13,13 @@ extern crate simplelog;
 use clap::derive::Clap;
 use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Copier, XCopy, PsCopyItem, WindowsRemoteCopier, Scp, RdpCopy};
+use crate::remote::{Computer, Copier, XCopy, PsCopy, WindowsRemoteCopier, Scp, RdpCopy};
 use crate::memory_acquirer::MemoryAcquirer;
 use crate::command_runner::CommandRunner;
 use crate::file_acquirer::download_files;
 use rpassword::read_password;
 use crate::registry_acquirer::RegistryAcquirer;
+use std::time::Duration;
 
 mod process_runner;
 mod evidence_acquirer;
@@ -140,6 +141,7 @@ fn main() -> Result<(), io::Error> {
             let copiers = create_windows_non_rdp_file_copiers(&opts);
             let mut non_rdp_success = false;
             for copier in copiers.into_iter() {
+                info!("Downloading specified files using {}",  copier.method_name());
                 let remote_copier = WindowsRemoteCopier::new(
                     remote_computer.clone(),
                     copier,
@@ -155,10 +157,11 @@ fn main() -> Result<(), io::Error> {
                     break;
                 }
             }
-            if non_rdp_success && (opts.rdp || opts.all) {
+            if !non_rdp_success && (opts.rdp || opts.all) {
                 let remote_copier = RdpCopy{
                     computer: remote_computer.clone()
                 };
+                info!("Downloading specified files using {}",  remote_copier.method_name());
                 let result = download_files(
                     search_files_path,
                     local_store_directory,
@@ -185,6 +188,7 @@ fn main() -> Result<(), io::Error> {
                 break;
             }
         }
+
     }
 
     Ok(())
@@ -289,6 +293,7 @@ fn create_memory_acquirers<'a>(
             MemoryAcquirer::rdp(
                 computer,
                 local_store_directory,
+                Duration::from_secs(60 * opts.rdp_wait_time)
             ),
         ]
     } else {
@@ -314,6 +319,7 @@ fn create_memory_acquirers<'a>(
                 MemoryAcquirer::rdp(
                     computer,
                     local_store_directory,
+                    Duration::from_secs(60 * opts.rdp_wait_time)
                 )
             );
         }
@@ -450,7 +456,7 @@ fn create_windows_non_rdp_file_copiers(opts: &Opts) -> Vec<Box<dyn Copier>> {
     let acquirers: Vec<Box<dyn Copier>> = if opts.all {
         vec![
             Box::new(XCopy {}),
-            Box::new(PsCopyItem {})
+            Box::new(PsCopy {})
         ]
     } else {
         let mut acquirers = Vec::<Box<dyn Copier>>::new();
@@ -461,7 +467,7 @@ fn create_windows_non_rdp_file_copiers(opts: &Opts) -> Vec<Box<dyn Copier>> {
         }
         if opts.psrem {
             acquirers.push(
-                Box::new(PsCopyItem {})
+                Box::new(PsCopy {})
             );
         }
         acquirers

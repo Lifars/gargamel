@@ -9,6 +9,8 @@ pub fn download_files(file_list: &Path,
                       downloader: &dyn RemoteCopier,
 ) -> io::Result<()> {
     let input_file = File::open(file_list)?;
+    let local_store_directory = dunce::canonicalize(local_store_directory)
+        .expect(&format!("Cannot canonicalize {}", local_store_directory.display()));
     for path_to_find in BufReader::new(input_file).lines() {
         if path_to_find.is_err() {
             warn!("Cannot read line in {}", file_list.display());

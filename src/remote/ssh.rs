@@ -1,8 +1,8 @@
-use crate::remote::{Connector, Computer, Command};
+use crate::remote::{Connector, Computer, Command, Copier, RemoteCopier};
 use std::io;
 use crate::process_runner::{create_report_path, run_piped_processes_blocking};
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 pub struct Ssh{
     pub key_file: Option<PathBuf>
@@ -50,7 +50,11 @@ impl Connector for Ssh {
             &prepared_command.all_program_args)
     }
 
-    fn prepare_command(&self, remote_computer: &Computer, command: Vec<String>, output_file_path: Option<String>) -> Vec<String> {
+    fn prepare_command(&self,
+                       remote_computer: &Computer,
+                       command: Vec<String>,
+                       output_file_path: Option<String>
+    ) -> Vec<String> {
         let program_name = "plink.exe".to_string();
         let mut prefix = vec![
             program_name,
@@ -77,5 +81,92 @@ impl Connector for Ssh {
                         output_file_path
                     ]).collect()
         }
+    }
+}
+
+pub struct Scp {
+    pub computer: Computer,
+    pub key_file: Option<PathBuf>,
+}
+
+impl Copier for Scp {
+    fn copy_file(
+        &self,
+        source: &Path,
+        target: &Path,
+    ) -> io::Result<()> {
+        let mut scp = vec![
+            "-l".to_string(),
+            self.computer.username.clone(),
+            "-pw".to_string(),
+            self.computer.password.clone(),
+        ];
+        if self.key_file.is_some() {
+            scp.push("-i".to_string());
+            scp.push(self.key_file.as_ref().unwrap().to_string_lossy().to_string())
+        }
+        scp.push(format!("{}", source.to_string_lossy()));
+        scp.push(format!("{}", target.to_string_lossy()));
+        run_piped_processes_blocking(
+            "cmd",
+            &[
+                "/c".to_string(),
+                "echo".to_string(),
+                "n".to_string()
+            ],
+            "pscp.exe",
+            &scp,
+        )
+    }
+
+    fn delete_file(&self, target: &Path) -> io::Result<()> {
+        let mut params = vec![
+            "-ssh".to_string(),
+            self.computer.address.clone(),
+            "-l".to_string(),
+            self.computer.username.clone(),
+            "-pw".to_string(),
+            self.computer.password.clone(),
+            "-no-antispoof".to_string()
+        ];
+        if self.key_file.is_some() {
+            params.push("-i".to_string());
+            params.push(self.key_file.as_ref().unwrap().to_string_lossy().to_string())
+        }
+        params.push("rm".to_string());
+        params.push("-f".to_string());
+        params.push(target.to_string_lossy().to_string());
+        run_piped_processes_blocking(
+            "cmd",
+            &[
+                "/c".to_string(),
+                "echo".to_string(),
+                "n".to_string()
+            ],
+            "plink.exe",
+            &params,
+        )
+    }
+
+    fn method_name(&self) -> &'static str {
+        "SCP"
+    }
+}
+
+impl RemoteCopier for Scp {
+    fn computer(&self) -> &Computer {
+        &self.computer
+    }
+
+    fn copier_impl(&self) -> &dyn Copier {
+        self as &dyn Copier
+    }
+
+    fn path_to_remote_form(&self, path: &Path) -> PathBuf {
+        PathBuf::from(format!(
+            "{}:{}",
+            self.computer().address,
+            path.to_str().unwrap()
+        ))
     }
 }

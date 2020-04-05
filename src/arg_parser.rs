@@ -69,6 +69,13 @@ pub struct Opts {
     )]
     pub image_memory: Option<String>,
 
+    #[clap(
+    long = "mem-image-rdp-wait",
+    help = "Optional: How long should wait before downloading mem image using rdp. Default is 5 (minutes)",
+    default_value = "5",
+    )]
+    pub rdp_wait_time: u64,
+
     #[clap(long = "key", help = "Optional: SSH private key file")]
     pub ssh_key: Option<String>,
 }
