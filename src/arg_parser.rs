@@ -19,9 +19,16 @@ pub struct Opts {
     pub user: String,
 
     #[clap(
+    short = "d",
+    long = "domain",
+    help = "Optional: Remote domain"
+    )]
+    pub domain: Option<String>,
+
+    #[clap(
     short = "p",
     long = "password",
-    help = "Remote user name"
+    help = "Optional: Remote user password"
     )]
     pub password: Option<String>,
     #[clap(

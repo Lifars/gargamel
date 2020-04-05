@@ -157,7 +157,7 @@ impl<'a> EvidenceAcquirer<'a> {
             store_directory,
             connector: Box::new(Ssh{ key_file }),
             firewall_state_command: Some(vec![
-                format!("echo {} | sudo -S iptables -L", remote_computer.password),
+                format!("echo {} | sudo -S iptables -L", remote_computer.password.clone().unwrap_or_default()),
             ]),
             network_state_command: Some(vec![
                 "ifconfig".to_string(),

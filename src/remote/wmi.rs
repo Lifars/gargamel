@@ -16,18 +16,18 @@ impl Connector for Wmi {
         let program_name = "wmic.exe".to_string();
 
         let address = format!("/NODE:{}", remote_computer.address);
-        let user = format!("/USER:{}", remote_computer.username);
-        let password = format!("/PASSWORD:{}", remote_computer.password);
+        let username = remote_computer.domain_username();
+        let user = format!("/USER:{}", username);
 
         let mut final_command = vec![program_name];
-        if output_file_path.is_some() {
-            final_command.push(format!("/OUTPUT:{}", output_file_path.unwrap()));
+        if let Some(output_file_path) = output_file_path {
+            final_command.push(format!("/OUTPUT:{}", output_file_path));
         }
-        final_command.extend_from_slice(&[
-            address,
-            user,
-            password,
-        ]);
+        final_command.push(address);
+        final_command.push(user);
+        if let Some(password) = &remote_computer.password {
+            final_command.push(format!("/PASSWORD:{}", password));
+        }
         final_command.extend(command.into_iter());
         final_command
     }
@@ -49,21 +49,19 @@ impl Connector for WmiProcess {
         let program_name = "wmic.exe".to_string();
 
         let address = format!("/NODE:{}", remote_computer.address);
-        let user = format!("/USER:{}", remote_computer.username);
-        let password = format!("/PASSWORD:{}", remote_computer.password);
+        let username = remote_computer.domain_username();
+        let user = format!("/USER:{}", username);
 
         let mut final_command = vec![program_name];
-        // if output_file_path.is_some() {
-        //     final_command.push(format!("/OUTPUT:{}", output_file_path.unwrap()));
-        // }
-        final_command.extend_from_slice(&[
-            address,
-            user,
-            password,
-            "process".to_string(),
-            "call".to_string(),
-            "create".to_string()
-        ]);
+        final_command.push(address);
+        final_command.push(user);
+        if let Some(password) = &remote_computer.password {
+            final_command.push(format!("/PASSWORD:{}", password));
+        }
+        final_command.push("process".to_string());
+        final_command.push("call".to_string());
+        final_command.push("create".to_string());
+
         final_command.extend(command.into_iter());
         final_command
     }

@@ -25,14 +25,20 @@ impl Connector for PsRemote {
             "-ScriptBlock".to_string(),
             "{".to_string(),
         ];
+        let username = remote_computer.domain_username();
+        let credential = match &remote_computer.password {
+            None => username,
+            Some(password) =>
+                format!(
+                    "(New-Object Management.Automation.PSCredential ('{}', (ConvertTo-SecureString '{}' -AsPlainText -Force)))",
+                    username,
+                    password
+                ),
+        };
         let suffix = vec![
             "}".to_string(),
             "-credential".to_string(),
-            format!(
-                "(New-Object Management.Automation.PSCredential ('{}', (ConvertTo-SecureString '{}' -AsPlainText -Force)))",
-                remote_computer.username,
-                remote_computer.password
-            ),
+            credential
         ];
         let almost_result = prefix.into_iter()
             .chain(command.into_iter())

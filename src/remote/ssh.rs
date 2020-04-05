@@ -62,13 +62,16 @@ impl Connector for Ssh {
             remote_computer.address.clone(),
             "-l".to_string(),
             remote_computer.username.clone(),
-            "-pw".to_string(),
-            remote_computer.password.clone(),
             "-no-antispoof".to_string()
         ];
-        if self.key_file.is_some() {
+        if let Some(password) = &remote_computer.password {
+            prefix.push("-pw".to_string());
+            prefix.push(password.clone());
+        }
+
+        if let Some(key_file) = &self.key_file {
             prefix.push("-i".to_string());
-            prefix.push(self.key_file.as_ref().unwrap().to_string_lossy().to_string())
+            prefix.push(key_file.to_string_lossy().to_string())
         }
         let almost_result = prefix.into_iter()
             .chain(command.into_iter());
@@ -98,12 +101,14 @@ impl Copier for Scp {
         let mut scp = vec![
             "-l".to_string(),
             self.computer.username.clone(),
-            "-pw".to_string(),
-            self.computer.password.clone(),
         ];
-        if self.key_file.is_some() {
+        if let Some(password) = &self.computer.password {
+            scp.push("-pw".to_string());
+            scp.push(password.clone());
+        }
+        if let Some(key_file) = &self.key_file {
             scp.push("-i".to_string());
-            scp.push(self.key_file.as_ref().unwrap().to_string_lossy().to_string())
+            scp.push(key_file.to_string_lossy().to_string())
         }
         scp.push(format!("{}", source.to_string_lossy()));
         scp.push(format!("{}", target.to_string_lossy()));
@@ -125,13 +130,15 @@ impl Copier for Scp {
             self.computer.address.clone(),
             "-l".to_string(),
             self.computer.username.clone(),
-            "-pw".to_string(),
-            self.computer.password.clone(),
             "-no-antispoof".to_string()
         ];
-        if self.key_file.is_some() {
+        if let Some(password) = &self.computer.password {
+            params.push("-pw".to_string());
+            params.push(password.clone());
+        }
+        if let Some(key_file) = &self.key_file {
             params.push("-i".to_string());
-            params.push(self.key_file.as_ref().unwrap().to_string_lossy().to_string())
+            params.push(key_file.to_string_lossy().to_string())
         }
         params.push("rm".to_string());
         params.push("-f".to_string());

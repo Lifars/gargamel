@@ -31,19 +31,29 @@ impl Connector for Rdp {
                     command_joined,
                     as_remote_path
                 )
-            },
+            }
         };
 
-        vec![
+        let mut prepared_command = vec![
             program_name,
             format!("computername={}", &remote_computer.address),
-            format!("username={}", &remote_computer.username),
-            format!("password={}", &remote_computer.password),
-            "exec=ps".to_string(),
-            "takeover=true".to_string(),
-            "connectdrive=true".to_string(),
-            command_as_arg
-        ]
+        ];
+
+        let username = match &remote_computer.domain {
+            None =>
+                remote_computer.username.clone(),
+            Some(domain) =>
+                format!("{}\\{}", domain, remote_computer.username),
+        };
+        prepared_command.push(format!("username={}", username));
+        if let Some(password) = &remote_computer.password {
+            prepared_command.push(format!("password={}", password));
+        }
+        prepared_command.push("exec=ps".to_string());
+        prepared_command.push("takeover=true".to_string());
+        prepared_command.push("connectdrive=true".to_string());
+        prepared_command.push(command_as_arg);
+        prepared_command
     }
 }
 
@@ -51,44 +61,42 @@ pub struct RdpCopy {
     pub computer: Computer,
 }
 
-impl Copier for RdpCopy {
-    fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
-        let args = vec![
+impl RdpCopy {
+    fn run_command(&self, command: String) -> io::Result<()> {
+        let mut args = vec![
             format!("computername={}", &self.computer.address),
-            format!("username={}", &self.computer.username),
-            format!("password={}", &self.computer.password),
             "exec=cmd".to_string(),
             "takeover=true".to_string(),
             "connectdrive=true".to_string(),
-            format!(
-                "command=xcopy {} {} /y",
-                source.to_string_lossy(),
-                target.to_string_lossy()
-            )
         ];
+        let username = self.computer.domain_username();
+        args.push(format!("username={}", username));
+        if let Some(password) = &self.computer.password {
+            args.push(format!("password={}", password));
+        }
+        args.push(command);
+
         run_process_blocking(
             "SharpRDP.exe",
             &args,
         )
     }
+}
+
+impl Copier for RdpCopy {
+    fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
+        self.run_command(format!(
+            "command=xcopy {} {} /y",
+            source.to_string_lossy(),
+            target.to_string_lossy()
+        ))
+    }
 
     fn delete_file(&self, target: &Path) -> io::Result<()> {
-        let args = vec![
-            format!("computername={}", &self.computer.address),
-            format!("username={}", &self.computer.username),
-            format!("password={}", &self.computer.password),
-            "exec=cmd".to_string(),
-            "takeover=true".to_string(),
-            "connectdrive=true".to_string(),
-            format!(
-                "command=del /f {}",
-                target.to_string_lossy()
-            )
-        ];
-        run_process_blocking(
-            "SharpRDP.exe",
-            &args,
-        )
+        self.run_command(format!(
+            "command=del /f {}",
+            target.to_string_lossy()
+        ))
     }
 
     fn method_name(&self) -> &'static str {
@@ -96,7 +104,7 @@ impl Copier for RdpCopy {
     }
 }
 
-impl RemoteCopier for RdpCopy{
+impl RemoteCopier for RdpCopy {
     fn computer(&self) -> &Computer {
         &self.computer
     }

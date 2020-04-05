@@ -12,7 +12,8 @@ impl Local {
             localhost: Computer {
                 address: String::from("127.0.0.1"),
                 username: String::new(),
-                password: String::new(),
+                password: None,
+                domain: None
             }
         }
     }

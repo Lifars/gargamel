@@ -8,7 +8,19 @@ use crate::arg_parser::Opts;
 pub struct Computer {
     pub address: String,
     pub username: String,
-    pub password: String,
+    pub domain: Option<String>,
+    pub password: Option<String>,
+}
+
+impl Computer{
+    pub fn domain_username(&self) -> String {
+        match &self.domain {
+            None =>
+                self.username.clone(),
+            Some(domain) =>
+                format!("{}\\{}", domain, self.username),
+        }
+    }
 }
 
 pub struct PreparedProgramToRun {
@@ -28,7 +40,8 @@ impl From<Opts> for Computer {
         Computer{
             address: opts.computer,
             username: opts.user,
-            password: opts.password.unwrap()
+            domain: opts.domain,
+            password: opts.password
         }
     }
 }

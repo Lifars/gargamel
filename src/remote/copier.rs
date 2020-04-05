@@ -111,14 +111,18 @@ impl WindowsRemoteCopier {
         computer: Computer,
         copier_impl: Box<dyn Copier>,
     ) -> WindowsRemoteCopier {
+        let mut args = vec![
+            "USE".to_string(),
+            format!("\\\\{}", computer.address),
+        ];
+        let username = computer.domain_username();
+        args.push(format!("/u:{}", username));
+        if let Some(password) = &computer.password {
+            args.push(password.clone());
+        }
         run_process_blocking(
             "NET",
-            &[
-                "USE".to_string(),
-                format!("\\\\{}", computer.address),
-                format!("/u:{}", computer.username),
-                format!("{}", computer.password),
-            ],
+            &args,
         ).expect(&format!(
             "Cannot establish connection using \"net use\" to {}", &computer.address
         ));
