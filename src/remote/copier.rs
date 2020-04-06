@@ -96,8 +96,8 @@ impl Drop for WindowsRemoteCopier {
             "NET",
             &[
                 "USE".to_string(),
-                // format!("\\\\{}\\IPC$", self.computer.address),
-                format!("\\\\{}", self.computer.address),
+                format!("\\\\{}\\IPC$", self.computer.address),
+                // format!("\\\\{}", self.computer.address),
                 "/D".to_string()
             ],
         ).expect(&format!(
