@@ -19,6 +19,7 @@ impl Connector for PsExec {
             address,
             "-u".to_string(),
             remote_computer.domain_username(),
+            "-h".to_string(),
         ];
         if let Some(password) = &remote_computer.password {
             prepared_command.push("-p".to_string());

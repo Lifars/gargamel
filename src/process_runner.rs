@@ -87,7 +87,7 @@ pub fn create_report_path(
                            method_name,
                            filename_prefix,
                            address_formatted,
-                           remote_computer.username
+                           remote_computer.username.replace(" ", "")
     );
     let file_path = store_directory.join(filename);
     {

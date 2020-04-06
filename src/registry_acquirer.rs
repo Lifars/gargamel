@@ -155,7 +155,7 @@ impl<'a> RegistryAcquirer<'a> {
                 )
             }
         }
-        thread::sleep(Duration::from_millis(10_000));
+        thread::sleep(Duration::from_millis(30_000));
         match self.copier.copy_from_remote(Path::new(&remote_report_path), report_path.parent().unwrap()) {
             Ok(_) => {}
             Err(err) => {
@@ -167,7 +167,7 @@ impl<'a> RegistryAcquirer<'a> {
                 )
             }
         }
-        thread::sleep(Duration::from_millis(1_000));
+        thread::sleep(Duration::from_millis(20_000));
         match self.copier.delete_remote_file(Path::new(&remote_report_path)) {
             Ok(_) => {}
             Err(err) => {

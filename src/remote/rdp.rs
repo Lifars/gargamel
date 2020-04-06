@@ -2,6 +2,7 @@ use crate::remote::{Connector, Computer, Copier, RemoteCopier};
 use std::path::{Path, PathBuf};
 use std::io;
 use crate::process_runner::run_process_blocking;
+use std::io::Error;
 
 pub struct Rdp {}
 
@@ -131,6 +132,10 @@ impl RemoteCopier for RdpCopy {
         self.copier_impl().copy_file(&self.path_to_remote_form(source), target)
     }
 
+    fn delete_remote_file(&self, target: &Path) -> io::Result<()> {
+        self.copier_impl().delete_file(target)
+    }
+
     fn copy_from_remote(
         &self,
         source: &Path,
@@ -138,4 +143,6 @@ impl RemoteCopier for RdpCopy {
     ) -> io::Result<()> {
         self.copier_impl().copy_file(source, &self.path_to_remote_form(target))
     }
+
+
 }

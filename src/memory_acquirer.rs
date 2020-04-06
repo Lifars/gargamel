@@ -129,28 +129,28 @@ impl<'a> MemoryAcquirer<'a> {
                 )
             }
         }
-        thread::sleep(Duration::from_millis(1000));
-        match remote_copier.delete_remote_file(&target_winpmem) {
-            Ok(_) => {}
-            Err(err) => {
-                error!("Cannot delete remote file {} using method {} due to {}",
-                       target_name.display(),
-                       self.connector.connect_method_name(),
-                       err
-                )
-            }
-        };
-        thread::sleep(Duration::from_millis(1000));
-        match remote_copier.delete_remote_file(&target_name) {
-            Ok(_) => {}
-            Err(err) => {
-                error!("Cannot delete remote file {} using method {} due to {}",
-                       target_name.display(),
-                       self.connector.connect_method_name(),
-                       err
-                )
-            }
-        };
+        // thread::sleep(Duration::from_millis(1000));
+        // match remote_copier.delete_remote_file(&target_winpmem) {
+        //     Ok(_) => {}
+        //     Err(err) => {
+        //         error!("Cannot delete remote file {} using method {} due to {}",
+        //                target_name.display(),
+        //                self.connector.connect_method_name(),
+        //                err
+        //         )
+        //     }
+        // };
+        // thread::sleep(Duration::from_millis(1000));
+        // match remote_copier.delete_remote_file(&target_name) {
+        //     Ok(_) => {}
+        //     Err(err) => {
+        //         error!("Cannot delete remote file {} using method {} due to {}",
+        //                target_name.display(),
+        //                self.connector.connect_method_name(),
+        //                err
+        //         )
+        //     }
+        // };
         Ok(())
     }
 }
