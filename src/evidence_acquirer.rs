@@ -139,11 +139,12 @@ impl<'a> EvidenceAcquirer<'a> {
     pub fn rdp(
         remote_computer: &'a Computer,
         store_directory: &'a Path,
+        nla: bool
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
             remote_computer,
             store_directory,
-            Box::new(Rdp {}),
+            Box::new(Rdp { nla }),
         )
     }
 
@@ -191,6 +192,7 @@ impl<'a> EvidenceAcquirer<'a> {
             command.to_vec(),
             Some(&self.store_directory),
             report_filename_prefix,
+            false
         );
 
         info!("{}: Checking {}",

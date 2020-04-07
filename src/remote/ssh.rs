@@ -4,7 +4,7 @@ use crate::process_runner::{create_report_path, run_piped_processes_blocking};
 use std::fs::File;
 use std::path::{PathBuf, Path};
 
-pub struct Ssh{
+pub struct Ssh {
     pub key_file: Option<PathBuf>
 }
 
@@ -41,6 +41,7 @@ impl Connector for Ssh {
             remote_connection.remote_computer,
             remote_connection.command,
             output_file_path,
+            false
         );
         let prepared_command = self.prepare_remote_process(processed_command);
         run_piped_processes_blocking(
@@ -53,10 +54,11 @@ impl Connector for Ssh {
     fn prepare_command(&self,
                        remote_computer: &Computer,
                        command: Vec<String>,
-                       output_file_path: Option<String>
+                       output_file_path: Option<String>,
+                       elevated: bool,
     ) -> Vec<String> {
         let program_name = "plink.exe".to_string();
-        let mut prefix = vec![
+        let mut prepared_command = vec![
             program_name,
             "-ssh".to_string(),
             remote_computer.address.clone(),
@@ -65,24 +67,30 @@ impl Connector for Ssh {
             "-no-antispoof".to_string()
         ];
         if let Some(password) = &remote_computer.password {
-            prefix.push("-pw".to_string());
-            prefix.push(password.clone());
+            prepared_command.push("-pw".to_string());
+            prepared_command.push(password.clone());
         }
 
         if let Some(key_file) = &self.key_file {
-            prefix.push("-i".to_string());
-            prefix.push(key_file.to_string_lossy().to_string())
+            prepared_command.push("-i".to_string());
+            prepared_command.push(key_file.to_string_lossy().to_string())
         }
-        let almost_result = prefix.into_iter()
-            .chain(command.into_iter());
+        if elevated {
+            if let Some(password) = &remote_computer.password {
+                prepared_command.push(format!("echo {} | sudo -S {}", password, command.join(" ")));
+            } else {
+                prepared_command.push(format!("sudo -S {}", command.join(" ")));
+            }
+        }else {
+            prepared_command.push(command.join(" "));
+        }
         match output_file_path {
-            None => almost_result.collect(),
-            Some(output_file_path) =>
-                almost_result
-                    .chain(vec![
-                        ">".to_string(),
-                        output_file_path
-                    ]).collect()
+            None => prepared_command,
+            Some(output_file_path) => {
+                prepared_command.push(">".to_string());
+                prepared_command.push(output_file_path);
+                prepared_command
+            }
         }
     }
 }

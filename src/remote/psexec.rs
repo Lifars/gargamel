@@ -11,6 +11,7 @@ impl Connector for PsExec {
                        remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
+                       elevated: bool
     ) -> Vec<String> {
         let address = format!("\\\\{}", remote_computer.address);
         let program_name = "paexec.exe".to_string();
@@ -19,11 +20,13 @@ impl Connector for PsExec {
             address,
             "-u".to_string(),
             remote_computer.domain_username(),
-            "-h".to_string(),
         ];
         if let Some(password) = &remote_computer.password {
             prepared_command.push("-p".to_string());
             prepared_command.push(password.clone());
+        }
+        if elevated {
+            prepared_command.push("-h".to_string());
         }
         prepared_command.extend(command.into_iter());
         match output_file_path {

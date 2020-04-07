@@ -13,7 +13,7 @@ impl Local {
                 address: String::from("127.0.0.1"),
                 username: String::new(),
                 password: None,
-                domain: None
+                domain: None,
             }
         }
     }
@@ -28,6 +28,7 @@ impl Connector for Local {
                        _remote_computer: &Computer,
                        command: Vec<String>,
                        _output_file_path: Option<String>,
+                       _elevated: bool,
     ) -> Vec<String> {
         command
     }

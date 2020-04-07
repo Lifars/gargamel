@@ -63,11 +63,12 @@ impl<'a> CommandRunner<'a> {
     pub fn rdp(
         remote_computer: &'a Computer,
         local_store_directory: &'a Path,
+        nla: bool
     )-> CommandRunner<'a>{
         CommandRunner{
             remote_computer,
             local_store_directory,
-            connector: Box::new(Rdp{}),
+            connector: Box::new(Rdp{ nla }),
             run_implicit: true
         }
     }
@@ -122,6 +123,9 @@ impl<'a> CommandRunner<'a> {
                 continue
             };
 
+            let elevated =
+                first_arg.contains(":admin") || first_arg.contains(":sudo");
+
             let command_joined: String = command.join("-");
             let command_joined = if command_joined.len() > 100 {
                 command_joined[..100].to_string()
@@ -141,6 +145,7 @@ impl<'a> CommandRunner<'a> {
                 command,
                 Some(&self.local_store_directory),
                 &report_filename_prefix,
+                elevated
             );
             match self.connector.connect_and_run_command(remote_connection) {
                 Ok(_) => {}

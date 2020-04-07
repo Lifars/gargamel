@@ -7,8 +7,9 @@ pub struct MemoryAcquirer<'a> {
     pub computer: &'a Computer,
     pub local_store_directory: &'a Path,
     pub connector: Box<dyn Connector>,
-    pub copier_factory: Box<dyn Fn(Computer) -> Box<dyn RemoteCopier>>,
-    pub manual_wait: Option<Duration>
+    pub copier_factory: Box<dyn Fn(Computer, bool) -> Box<dyn RemoteCopier>>,
+    pub manual_wait: Option<Duration>,
+    pub nla: bool
 }
 
 impl<'a> MemoryAcquirer<'a> {
@@ -20,12 +21,13 @@ impl<'a> MemoryAcquirer<'a> {
             computer: remote_computer,
             local_store_directory,
             connector: Box::new(PsExec {}),
-            copier_factory: Box::new(|computer: Computer|
+            copier_factory: Box::new(|computer: Computer, _nla: bool|
                 Box::new(WindowsRemoteCopier::new(
                     computer,
                     Box::new(XCopy {}),
                 ))),
-            manual_wait: None
+            manual_wait: None,
+            nla: false
         }
     }
 
@@ -48,31 +50,35 @@ impl<'a> MemoryAcquirer<'a> {
             computer: remote_computer,
             local_store_directory,
             connector: Box::new(PsRemote {}),
-            copier_factory: Box::new(|computer: Computer|
+            copier_factory: Box::new(|computer: Computer, _nla: bool|
                 Box::new(WindowsRemoteCopier::new(
                     computer,
                     Box::new(PsCopy {}),
                 ))
             ),
-            manual_wait: None
+            manual_wait: None,
+            nla: false
         }
     }
 
     pub fn rdp(
         remote_computer: &'a Computer,
         local_store_directory: &'a Path,
-        manual_wait: Duration
+        manual_wait: Duration,
+        nla: bool
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             computer: remote_computer,
             local_store_directory,
-            connector: Box::new(Rdp {}),
-            copier_factory: Box::new(|computer: Computer|
+            connector: Box::new(Rdp { nla }),
+            copier_factory: Box::new(|computer: Computer, nla: bool|
                 Box::new(RdpCopy {
                     computer,
+                    nla
                 })
             ),
-            manual_wait: Some(manual_wait)
+            manual_wait: Some(manual_wait),
+            nla
         }
     }
 
@@ -91,7 +97,10 @@ impl<'a> MemoryAcquirer<'a> {
         };
         let target_store = target_name.parent().unwrap();
         let target_winpmem = target_store.join(winpmem);
-        let remote_copier = self.copier_factory.as_ref()(self.computer.clone());
+        let remote_copier = self.copier_factory.as_ref()(
+            self.computer.clone(),
+            self.nla
+        );
         remote_copier.copy_to_remote(
             &source_winpmem,
             &target_store,
@@ -109,6 +118,7 @@ impl<'a> MemoryAcquirer<'a> {
             ],
             store_directory: None,
             report_filename_prefix: "mem-ack-log",
+            elevated: true
         };
         self.connector.connect_and_run_command(connection)?;
         if self.manual_wait.is_some() {

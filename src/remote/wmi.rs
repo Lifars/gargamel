@@ -3,7 +3,6 @@ use crate::remote::{Connector, Computer};
 pub struct Wmi {}
 
 impl Connector for Wmi {
-
     fn connect_method_name(&self) -> &'static str {
         return "WMI";
     }
@@ -12,6 +11,7 @@ impl Connector for Wmi {
                        remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
+                       _elevated: bool,
     ) -> Vec<String> {
         let program_name = "wmic.exe".to_string();
 
@@ -33,10 +33,9 @@ impl Connector for Wmi {
     }
 }
 
-pub struct WmiProcess{}
+pub struct WmiProcess {}
 
 impl Connector for WmiProcess {
-
     fn connect_method_name(&self) -> &'static str {
         return "WMI";
     }
@@ -45,6 +44,7 @@ impl Connector for WmiProcess {
                        remote_computer: &Computer,
                        command: Vec<String>,
                        _output_file_path: Option<String>,
+                       _elevated: bool,
     ) -> Vec<String> {
         let program_name = "wmic.exe".to_string();
 

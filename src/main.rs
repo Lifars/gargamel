@@ -125,7 +125,8 @@ fn main() -> Result<(), io::Error> {
             }
             if !non_rdp_success && (opts.rdp || opts.all) {
                 let remote_copier = RdpCopy{
-                    computer: remote_computer.clone()
+                    computer: remote_computer.clone(),
+                    nla: opts.nla
                 };
                 info!("Downloading specified files using {}",  remote_copier.method_name());
                 let result = download_files(
@@ -183,6 +184,7 @@ fn create_evidence_acquirers<'a>(
             EvidenceAcquirer::rdp(
                 computer,
                 local_store_directory,
+                opts.nla
             ),
         ]
     } else {
@@ -233,6 +235,7 @@ fn create_evidence_acquirers<'a>(
                 EvidenceAcquirer::rdp(
                     computer,
                     local_store_directory,
+                    opts.nla
                 ),
             )
         }
@@ -259,7 +262,8 @@ fn create_memory_acquirers<'a>(
             MemoryAcquirer::rdp(
                 computer,
                 local_store_directory,
-                Duration::from_secs(60 * opts.rdp_wait_time)
+                Duration::from_secs(60 * opts.rdp_wait_time),
+                opts.nla
             ),
         ]
     } else {
@@ -285,7 +289,8 @@ fn create_memory_acquirers<'a>(
                 MemoryAcquirer::rdp(
                     computer,
                     local_store_directory,
-                    Duration::from_secs(60 * opts.rdp_wait_time)
+                    Duration::from_secs(60 * opts.rdp_wait_time),
+                    opts.nla
                 )
             );
         }
@@ -359,6 +364,7 @@ fn create_command_runners<'a>(
                 CommandRunner::rdp(
                     computer,
                     local_store_directory,
+                    opts.nla
                 )
             )
         }
@@ -385,6 +391,7 @@ fn create_registry_acquirers<'a>(
             RegistryAcquirer::rdp(
                 computer,
                 local_store_directory,
+                opts.nla
             ),
         ]
     } else {
@@ -410,6 +417,7 @@ fn create_registry_acquirers<'a>(
                 RegistryAcquirer::rdp(
                     computer,
                     local_store_directory,
+                    opts.nla
                 ),
             )
         }

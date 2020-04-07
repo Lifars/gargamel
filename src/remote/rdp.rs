@@ -2,9 +2,10 @@ use crate::remote::{Connector, Computer, Copier, RemoteCopier};
 use std::path::{Path, PathBuf};
 use std::io;
 use crate::process_runner::run_process_blocking;
-use std::io::Error;
 
-pub struct Rdp {}
+pub struct Rdp {
+    pub nla: bool
+}
 
 impl Connector for Rdp {
     fn connect_method_name(&self) -> &'static str {
@@ -15,6 +16,7 @@ impl Connector for Rdp {
                        remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
+                       elevated: bool,
     ) -> Vec<String> {
         let program_name = "SharpRDP.exe".to_string();
         let command_joined: String = command.join(" ");
@@ -50,6 +52,15 @@ impl Connector for Rdp {
         if let Some(password) = &remote_computer.password {
             prepared_command.push(format!("password={}", password));
         }
+
+        if self.nla {
+            prepared_command.push("nla=true".to_string());
+        }
+
+        if elevated {
+            prepared_command.push("elevated=taskmgr".to_string());
+        }
+
         prepared_command.push("exec=ps".to_string());
         prepared_command.push("takeover=true".to_string());
         prepared_command.push("connectdrive=true".to_string());
@@ -60,6 +71,7 @@ impl Connector for Rdp {
 
 pub struct RdpCopy {
     pub computer: Computer,
+    pub nla: bool,
 }
 
 impl RdpCopy {
@@ -74,6 +86,9 @@ impl RdpCopy {
         args.push(format!("username={}", username));
         if let Some(password) = &self.computer.password {
             args.push(format!("password={}", password));
+        }
+        if self.nla {
+            args.push("nla=true".to_string());
         }
         args.push(command);
 
@@ -143,6 +158,4 @@ impl RemoteCopier for RdpCopy {
     ) -> io::Result<()> {
         self.copier_impl().copy_file(source, &self.path_to_remote_form(target))
     }
-
-
 }

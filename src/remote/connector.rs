@@ -12,7 +12,7 @@ pub struct Computer {
     pub password: Option<String>,
 }
 
-impl Computer{
+impl Computer {
     pub fn domain_username(&self) -> String {
         match &self.domain {
             None =>
@@ -33,15 +33,16 @@ pub struct Command<'a> {
     pub command: Vec<String>,
     pub store_directory: Option<&'a Path>,
     pub report_filename_prefix: &'a str,
+    pub elevated: bool,
 }
 
 impl From<Opts> for Computer {
     fn from(opts: Opts) -> Self {
-        Computer{
+        Computer {
             address: opts.computer,
             username: opts.user,
             domain: opts.domain,
-            password: opts.password
+            password: opts.password,
         }
     }
 }
@@ -52,12 +53,14 @@ impl<'a> Command<'a> {
         command: Vec<String>,
         store_directory: Option<&'a Path>,
         report_filename_prefix: &'a str,
+        elevated: bool,
     ) -> Command<'a> {
         Command {
             remote_computer,
             command,
             store_directory,
             report_filename_prefix,
+            elevated,
         }
     }
 }
@@ -90,6 +93,7 @@ pub trait Connector {
             remote_connection.remote_computer,
             remote_connection.command,
             output_file_path,
+            remote_connection.elevated
         );
 
         let prepared_command = self.prepare_remote_process(processed_command);
@@ -116,5 +120,6 @@ pub trait Connector {
                        remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
+                       elevated: bool,
     ) -> Vec<String>;
 }

@@ -85,5 +85,8 @@ pub struct Opts {
 
     #[clap(long = "key", help = "Optional: SSH private key file")]
     pub ssh_key: Option<String>,
+
+    #[clap(long = "nla", help = "Optional: Use network level authentication for RDP")]
+    pub nla: bool,
 }
 

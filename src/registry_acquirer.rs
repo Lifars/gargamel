@@ -105,12 +105,13 @@ impl<'a> RegistryAcquirer<'a> {
     pub fn rdp(
         remote_computer: &'a Computer,
         store_directory: &'a Path,
+        nla: bool
     ) -> RegistryAcquirer<'a> {
         RegistryAcquirer::new_standard_acquirer(
             remote_computer,
             store_directory,
-            Box::new(Rdp {}),
-            Box::new(RdpCopy { computer: remote_computer.clone() }),
+            Box::new(Rdp { nla }),
+            Box::new(RdpCopy { computer: remote_computer.clone(), nla }),
         )
     }
 
@@ -138,6 +139,7 @@ impl<'a> RegistryAcquirer<'a> {
             command,
             None,
             report_filename_prefix,
+            false
         );
 
         info!("{}: Checking {}",
@@ -155,7 +157,7 @@ impl<'a> RegistryAcquirer<'a> {
                 )
             }
         }
-        thread::sleep(Duration::from_millis(30_000));
+        thread::sleep(Duration::from_millis(60_000));
         match self.copier.copy_from_remote(Path::new(&remote_report_path), report_path.parent().unwrap()) {
             Ok(_) => {}
             Err(err) => {
@@ -167,7 +169,7 @@ impl<'a> RegistryAcquirer<'a> {
                 )
             }
         }
-        thread::sleep(Duration::from_millis(20_000));
+        thread::sleep(Duration::from_millis(30_000));
         match self.copier.delete_remote_file(Path::new(&remote_report_path)) {
             Ok(_) => {}
             Err(err) => {

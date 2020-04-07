@@ -14,9 +14,10 @@ impl Connector for PsRemote {
                        remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
+                       elevated: bool,
     ) -> Vec<String> {
         let program_name = "powershell.exe".to_string();
-        let prefix = vec![
+        let mut prepared_command = vec![
             program_name,
             "-command".to_string(),
             "Invoke-Command".to_string(),
@@ -25,6 +26,14 @@ impl Connector for PsRemote {
             "-ScriptBlock".to_string(),
             "{".to_string(),
         ];
+        if elevated {
+            prepared_command.push("start-process".to_string());
+            prepared_command.push(format!("'{}'", command[0].clone()));
+            prepared_command.push("-argumentlist".to_string());
+            prepared_command.push(format!("'{}'", command[1..].join(" ")));
+        } else {
+            prepared_command.extend(command);
+        }
         let username = remote_computer.domain_username();
         let credential = match &remote_computer.password {
             None => username,
@@ -35,21 +44,16 @@ impl Connector for PsRemote {
                     password
                 ),
         };
-        let suffix = vec![
-            "}".to_string(),
-            "-credential".to_string(),
-            credential
-        ];
-        let almost_result = prefix.into_iter()
-            .chain(command.into_iter())
-            .chain(suffix.into_iter());
+        prepared_command.push("}".to_string());
+        prepared_command.push("-credential".to_string());
+        prepared_command.push(credential);
         match output_file_path {
-            None => almost_result.collect(),
-            Some(output_file_path) =>
-                almost_result.chain(vec![
-                    ">".to_string(),
-                    output_file_path
-                ].into_iter()).collect(),
+            None => prepared_command,
+            Some(output_file_path) => {
+                prepared_command.push(">".to_string());
+                prepared_command.push(output_file_path);
+                prepared_command
+            }
         }
     }
 }
