@@ -1,8 +1,7 @@
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Wmi, Ssh, Rdp};
+use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Wmic, Ssh, Rdp, WmiImplant};
 
 pub struct EvidenceAcquirer<'a> {
-    remote_computer: &'a Computer,
     store_directory: &'a Path,
     connector: Box<dyn Connector>,
 
@@ -17,12 +16,10 @@ pub struct EvidenceAcquirer<'a> {
 
 impl<'a> EvidenceAcquirer<'a> {
     fn new_standard_acquirer(
-        remote_computer: &'a Computer,
         store_directory: &'a Path,
         remote_connector: Box<dyn Connector>,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer {
-            remote_computer,
             store_directory,
             connector: remote_connector,
             firewall_state_command: Some(vec![
@@ -61,46 +58,51 @@ impl<'a> EvidenceAcquirer<'a> {
     }
 
     pub fn psexec(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         store_directory: &'a Path,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
-            remote_computer,
             store_directory,
-            Box::new(PsExec {}),
+            Box::new(PsExec { computer: remote_computer }),
         )
     }
 
     pub fn psremote(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         store_directory: &'a Path,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
-            remote_computer,
             store_directory,
-            Box::new(PsRemote {}),
+            Box::new(PsRemote { computer: remote_computer }),
         )
     }
 
     pub fn local(
-        remote_computer: &'a Computer,
         store_directory: &'a Path,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
-            remote_computer,
             store_directory,
             Box::new(Local::new()),
         )
     }
 
     pub fn wmi(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
+        store_directory: &'a Path,
+    ) -> EvidenceAcquirer<'a> {
+        EvidenceAcquirer::new_standard_acquirer(
+            store_directory,
+            Box::new(WmiImplant { computer: remote_computer }),
+        )
+    }
+
+    pub fn wmic(
+        remote_computer: Computer,
         store_directory: &'a Path,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer {
-            remote_computer,
             store_directory,
-            connector: Box::new(Wmi{}),
+            connector: Box::new(Wmic { computer: remote_computer }),
             firewall_state_command: None,
             network_state_command: Some(vec![
                 "nic".to_string(),
@@ -137,28 +139,30 @@ impl<'a> EvidenceAcquirer<'a> {
     }
 
     pub fn rdp(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         store_directory: &'a Path,
-        nla: bool
+        nla: bool,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
-            remote_computer,
             store_directory,
-            Box::new(Rdp { nla }),
+            Box::new(Rdp {
+                nla,
+                connection_time: None,
+                computer: remote_computer
+            }),
         )
     }
 
     pub fn ssh(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         store_directory: &'a Path,
         key_file: Option<PathBuf>
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer {
-            remote_computer,
             store_directory,
-            connector: Box::new(Ssh{ key_file }),
+            connector: Box::new(Ssh{ key_file, computer: remote_computer.clone() }),
             firewall_state_command: Some(vec![
-                format!("echo {} | sudo -S iptables -L", remote_computer.password.clone().unwrap_or_default()),
+                format!("echo {} | sudo -S iptables -L", remote_computer.password.unwrap_or_default()),
             ]),
             network_state_command: Some(vec![
                 "ifconfig".to_string(),
@@ -188,11 +192,11 @@ impl<'a> EvidenceAcquirer<'a> {
             return;
         }
         let remote_connection = Command::new(
-            &self.remote_computer,
             command.to_vec(),
             Some(&self.store_directory),
             report_filename_prefix,
-            false
+            false,
+            None
         );
 
         info!("{}: Checking {}",

@@ -56,6 +56,8 @@ pub struct Opts {
 
     #[clap(short = "a", long = "all")]
     pub all: bool,
+    #[clap(long = "wmic")]
+    pub wmic: bool,
     #[clap(long = "wmi")]
     pub wmi: bool,
     #[clap(long = "rdp")]
@@ -77,11 +79,11 @@ pub struct Opts {
     pub image_memory: Option<String>,
 
     #[clap(
-    long = "mem-image-rdp-wait",
-    help = "Optional: How long should wait before downloading mem image using rdp. Default is 5 (minutes)",
-    default_value = "5",
+    long = "timeout",
+    help = "Optional: Timeout of long running operations. Default is 300 (seconds)",
+    default_value = "300",
     )]
-    pub rdp_wait_time: u64,
+    pub wait_time: u64,
 
     #[clap(long = "key", help = "Optional: SSH private key file")]
     pub ssh_key: Option<String>,

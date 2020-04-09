@@ -55,7 +55,7 @@ impl Copier for XCopy {
 }
 
 pub trait RemoteCopier {
-    fn computer(&self) -> &Computer;
+    fn remote_computer(&self) -> &Computer;
     fn copier_impl(&self) -> &dyn Copier;
 
     fn path_to_remote_form(
@@ -131,7 +131,7 @@ impl WindowsRemoteCopier {
 }
 
 impl RemoteCopier for WindowsRemoteCopier {
-    fn computer(&self) -> &Computer {
+    fn remote_computer(&self) -> &Computer {
         &self.computer
     }
 
@@ -145,7 +145,7 @@ impl RemoteCopier for WindowsRemoteCopier {
     ) -> PathBuf {
         PathBuf::from(format!(
             "\\\\{}\\{}",
-            self.computer().address,
+            self.remote_computer().address,
             path.to_str().unwrap().replacen(":", "$", 1)
         ))
     }

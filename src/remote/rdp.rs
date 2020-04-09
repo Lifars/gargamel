@@ -1,10 +1,13 @@
-use crate::remote::{Connector, Computer, Copier, RemoteCopier};
+use crate::remote::{Connector, Computer, Copier, RemoteCopier, Command};
 use std::path::{Path, PathBuf};
 use std::io;
-use crate::process_runner::run_process_blocking;
+use crate::process_runner::{run_process_blocking, create_report_path, run_process_blocking_timed, run_process_blocking_maybe_timed};
+use std::time::Duration;
 
 pub struct Rdp {
-    pub nla: bool
+    pub computer: Computer,
+    pub nla: bool,
+    pub connection_time: Option<Duration>,
 }
 
 impl Connector for Rdp {
@@ -12,30 +15,17 @@ impl Connector for Rdp {
         return "RDP";
     }
 
+    fn computer(&self) -> &Computer {
+        &self.computer
+    }
+
     fn prepare_command(&self,
-                       remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
                        elevated: bool,
     ) -> Vec<String> {
+        let remote_computer = self.remote_computer();
         let program_name = "SharpRDP.exe".to_string();
-        let command_joined: String = command.join(" ");
-        let command_as_arg = match output_file_path {
-            None => format!("command={}", command_joined),
-            Some(output_file_path) => {
-                let path = Path::new(&output_file_path);
-                let canon_path = dunce::canonicalize(path).unwrap();
-                let as_remote_path = canon_path
-                    .to_string_lossy()
-                    .replacen(":", "", 1);
-                format!(
-                    // "command={} -p.i.p.e- Out-File -FilePath \\\\tsclient\\C\\Users\\Public\\funguj.txt",//\\\\tsclient\\{}\"",
-                    "command={} -p.i.p.e- Out-File -FilePath \\\\tsclient\\{}",
-                    command_joined,
-                    as_remote_path
-                )
-            }
-        };
 
         let mut prepared_command = vec![
             program_name,
@@ -64,17 +54,69 @@ impl Connector for Rdp {
         prepared_command.push("exec=ps".to_string());
         prepared_command.push("takeover=true".to_string());
         prepared_command.push("connectdrive=true".to_string());
+
+        if let Some(time) = self.connection_time {
+            prepared_command.push(format!("time={}", time.as_secs() * 60));
+        }
+
+        let command_joined: String = command.join(" ");
+        let command_as_arg = match output_file_path {
+            None => format!("command={}", command_joined),
+            Some(output_file_path) => {
+                let path = Path::new(&output_file_path);
+                let canon_path = dunce::canonicalize(path).unwrap();
+                let as_remote_path = canon_path
+                    .to_string_lossy()
+                    .replacen(":", "", 1);
+                format!(
+                    // "command={} -p.i.p.e- Out-File -FilePath \\\\tsclient\\C\\Users\\Public\\funguj.txt",//\\\\tsclient\\{}\"",
+                    "command={} -p.i.p.e- Out-File -FilePath \\\\tsclient\\{}",
+                    command_joined,
+                    as_remote_path
+                )
+            }
+        };
         prepared_command.push(command_as_arg);
         prepared_command
     }
+
+    fn connect_and_run_command(
+        &self,
+        remote_connection: Command<'_>,
+    ) -> io::Result<()> {
+        debug!("Trying to run command {:?} on {}",
+               remote_connection.command,
+               &self.computer().address
+        );
+        let output_file_path = match remote_connection.store_directory {
+            None => None,
+            Some(store_directory) => {
+                let file_path = create_report_path(
+                    self.computer(),
+                    store_directory,
+                    &remote_connection.report_filename_prefix,
+                    self.connect_method_name(),
+                );
+                Some(file_path.to_str().unwrap().to_string())
+            }
+        };
+
+        let processed_command = self.prepare_command(
+            remote_connection.command,
+            output_file_path,
+            remote_connection.elevated,
+        );
+
+        let prepared_command = self.prepare_remote_process(processed_command);
+        let result = run_process_blocking(&prepared_command.program_path, &prepared_command.all_program_args);
+        if let Some(timeout) = remote_connection.timeout {
+            std::thread::sleep(timeout);
+        }
+        result
+    }
 }
 
-pub struct RdpCopy {
-    pub computer: Computer,
-    pub nla: bool,
-}
-
-impl RdpCopy {
+impl Rdp {
     fn run_command(&self, command: String) -> io::Result<()> {
         let mut args = vec![
             format!("computername={}", &self.computer.address),
@@ -91,7 +133,6 @@ impl RdpCopy {
             args.push("nla=true".to_string());
         }
         args.push(command);
-
         run_process_blocking(
             "SharpRDP.exe",
             &args,
@@ -99,7 +140,7 @@ impl RdpCopy {
     }
 }
 
-impl Copier for RdpCopy {
+impl Copier for Rdp {
     fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
         self.run_command(format!(
             "command=xcopy {} {} /y",
@@ -120,8 +161,8 @@ impl Copier for RdpCopy {
     }
 }
 
-impl RemoteCopier for RdpCopy {
-    fn computer(&self) -> &Computer {
+impl RemoteCopier for Rdp {
+    fn remote_computer(&self) -> &Computer {
         &self.computer
     }
 

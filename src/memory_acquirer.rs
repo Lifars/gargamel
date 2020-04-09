@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, RemoteCopier, XCopy, PsCopy, WindowsRemoteCopier, RdpCopy, Rdp};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, RemoteCopier, XCopy, PsCopy, WindowsRemoteCopier, Rdp, WmiImplant};
 use std::path::Path;
 use std::{io, thread};
 use std::time::Duration;
@@ -20,7 +20,7 @@ impl<'a> MemoryAcquirer<'a> {
         MemoryAcquirer {
             computer: remote_computer,
             local_store_directory,
-            connector: Box::new(PsExec {}),
+            connector: Box::new(PsExec { computer: remote_computer.clone() }),
             copier_factory: Box::new(|computer: Computer, _nla: bool|
                 Box::new(WindowsRemoteCopier::new(
                     computer,
@@ -49,7 +49,7 @@ impl<'a> MemoryAcquirer<'a> {
         MemoryAcquirer {
             computer: remote_computer,
             local_store_directory,
-            connector: Box::new(PsRemote {}),
+            connector: Box::new(PsRemote { computer: remote_computer.clone() }),
             copier_factory: Box::new(|computer: Computer, _nla: bool|
                 Box::new(WindowsRemoteCopier::new(
                     computer,
@@ -61,23 +61,45 @@ impl<'a> MemoryAcquirer<'a> {
         }
     }
 
-    pub fn rdp(
+    pub fn wmi(
         remote_computer: &'a Computer,
         local_store_directory: &'a Path,
-        manual_wait: Duration,
-        nla: bool
+        timeout: Option<Duration>
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             computer: remote_computer,
             local_store_directory,
-            connector: Box::new(Rdp { nla }),
+            connector: Box::new(WmiImplant { computer: remote_computer.clone() }),
+            copier_factory: Box::new(|computer: Computer, _nla: bool|
+                Box::new(WmiImplant{ computer })
+            ),
+            manual_wait: timeout,
+            nla: false
+        }
+    }
+
+    pub fn rdp(
+        remote_computer: &'a Computer,
+        local_store_directory: &'a Path,
+        nla: bool,
+        timeout: Option<Duration>
+    ) -> MemoryAcquirer<'a> {
+        MemoryAcquirer {
+            computer: remote_computer,
+            local_store_directory,
+            connector: Box::new(Rdp {
+                nla,
+                connection_time: timeout.clone(),
+                computer: remote_computer.clone()
+            }),
             copier_factory: Box::new(|computer: Computer, nla: bool|
-                Box::new(RdpCopy {
+                Box::new(Rdp {
                     computer,
-                    nla
+                    nla,
+                    connection_time: Some(Duration::from_secs(10))
                 })
             ),
-            manual_wait: Some(manual_wait),
+            manual_wait: timeout,
             nla
         }
     }
@@ -106,8 +128,8 @@ impl<'a> MemoryAcquirer<'a> {
             &target_store,
         )?;
         trace!("Winpmem target path: {:#?}", target_winpmem);
+        thread::sleep(Duration::from_millis(20_000));
         let connection = Command {
-            remote_computer: &self.computer,
             command: vec![
                 target_winpmem.to_string_lossy().to_string(),
                 "--format".to_string(),
@@ -118,12 +140,10 @@ impl<'a> MemoryAcquirer<'a> {
             ],
             store_directory: None,
             report_filename_prefix: "mem-ack-log",
-            elevated: true
+            elevated: true,
+            timeout: self.manual_wait.clone()
         };
         self.connector.connect_and_run_command(connection)?;
-        if self.manual_wait.is_some() {
-            thread::sleep(self.manual_wait.unwrap());
-        }
         match remote_copier.copy_from_remote(
             &target_name,
             &local_store_directory,

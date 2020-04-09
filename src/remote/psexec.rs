@@ -1,18 +1,24 @@
 use crate::remote::{Connector, Computer};
 
-pub struct PsExec {}
+pub struct PsExec {
+    pub computer: Computer
+}
 
 impl Connector for PsExec {
     fn connect_method_name(&self) -> &'static str {
         return "PSEXEC";
     }
 
+    fn computer(&self) -> &Computer {
+        &self.computer
+    }
+
     fn prepare_command(&self,
-                       remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
                        elevated: bool
     ) -> Vec<String> {
+        let remote_computer = self.computer();
         let address = format!("\\\\{}", remote_computer.address);
         let program_name = "paexec.exe".to_string();
         let mut prepared_command = vec![

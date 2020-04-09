@@ -24,8 +24,11 @@ impl Connector for Local {
         return "LOCAL";
     }
 
+    fn computer(&self) -> &Computer {
+        &self.localhost
+    }
+
     fn prepare_command(&self,
-                       _remote_computer: &Computer,
                        command: Vec<String>,
                        _output_file_path: Option<String>,
                        _elevated: bool,
@@ -51,7 +54,7 @@ impl Copier for Local {
 }
 
 impl RemoteCopier for Local {
-    fn computer(&self) -> &Computer {
+    fn remote_computer(&self) -> &Computer {
         &self.localhost
     }
 

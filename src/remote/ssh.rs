@@ -5,6 +5,7 @@ use std::fs::File;
 use std::path::{PathBuf, Path};
 
 pub struct Ssh {
+    pub computer: Computer,
     pub key_file: Option<PathBuf>
 }
 
@@ -13,16 +14,20 @@ impl Connector for Ssh {
         "SSH"
     }
 
+    fn computer(&self) -> &Computer {
+        &self.computer
+    }
+
     fn connect_and_run_command(&self, remote_connection: Command<'_>) -> io::Result<()> {
         debug!("Trying to run command {:?} on {}",
                remote_connection.command,
-               remote_connection.remote_computer.address
+               &self.computer().address
         );
         let output_file_path = match remote_connection.store_directory {
             None => None,
             Some(store_directory) => {
                 let file_path = create_report_path(
-                    &remote_connection.remote_computer,
+                    &self.computer(),
                     store_directory,
                     &remote_connection.report_filename_prefix,
                     self.connect_method_name(),
@@ -38,7 +43,6 @@ impl Connector for Ssh {
         let prepared_echo = self.prepare_remote_process(echo);
 
         let processed_command = self.prepare_command(
-            remote_connection.remote_computer,
             remote_connection.command,
             output_file_path,
             false
@@ -52,11 +56,11 @@ impl Connector for Ssh {
     }
 
     fn prepare_command(&self,
-                       remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
                        elevated: bool,
     ) -> Vec<String> {
+        let remote_computer = self.remote_computer();
         let program_name = "plink.exe".to_string();
         let mut prepared_command = vec![
             program_name,
@@ -95,12 +99,7 @@ impl Connector for Ssh {
     }
 }
 
-pub struct Scp {
-    pub computer: Computer,
-    pub key_file: Option<PathBuf>,
-}
-
-impl Copier for Scp {
+impl Copier for Ssh {
     fn copy_file(
         &self,
         source: &Path,
@@ -168,8 +167,8 @@ impl Copier for Scp {
     }
 }
 
-impl RemoteCopier for Scp {
-    fn computer(&self) -> &Computer {
+impl RemoteCopier for Ssh {
+    fn remote_computer(&self) -> &Computer {
         &self.computer
     }
 
@@ -180,7 +179,7 @@ impl RemoteCopier for Scp {
     fn path_to_remote_form(&self, path: &Path) -> PathBuf {
         PathBuf::from(format!(
             "{}:{}",
-            self.computer().address,
+            self.remote_computer().address,
             path.to_str().unwrap()
         ))
     }

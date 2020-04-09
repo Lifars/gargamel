@@ -3,19 +3,25 @@ use std::path::Path;
 use std::io;
 use crate::process_runner::run_process_blocking;
 
-pub struct PsRemote {}
+pub struct PsRemote {
+    pub computer: Computer
+}
 
 impl Connector for PsRemote {
     fn connect_method_name(&self) -> &'static str {
         return "PSREM";
     }
 
+    fn computer(&self) -> &Computer {
+        &self.computer
+    }
+
     fn prepare_command(&self,
-                       remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
                        elevated: bool,
     ) -> Vec<String> {
+        let remote_computer = self.computer();
         let program_name = "powershell.exe".to_string();
         let mut prepared_command = vec![
             program_name,

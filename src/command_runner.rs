@@ -1,10 +1,10 @@
-use crate::remote::{Computer, Connector, Command, PsExec, WmiProcess, Local, PsRemote, Ssh, Rdp};
+use crate::remote::{Computer, Connector, Command, PsExec, WmiProcess, Local, PsRemote, Ssh, Rdp, WmiImplant};
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use crate::command_utils::parse_command;
+use std::time::Duration;
 
 pub struct CommandRunner<'a> {
-    remote_computer: &'a Computer,
     local_store_directory: &'a Path,
     pub(crate) connector: Box<dyn Connector>,
     run_implicit: bool
@@ -13,35 +13,42 @@ pub struct CommandRunner<'a> {
 impl<'a> CommandRunner<'a> {
 
     pub fn psexec(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         local_store_directory: &'a Path,
     )-> CommandRunner<'a>{
         CommandRunner{
-            remote_computer,
             local_store_directory,
-            connector: Box::new(PsExec{}),
+            connector: Box::new(PsExec{ computer: remote_computer }),
             run_implicit: true
         }
     }
 
     pub fn wmi(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         local_store_directory: &'a Path,
     )-> CommandRunner<'a>{
         CommandRunner{
-            remote_computer,
             local_store_directory,
-            connector: Box::new(WmiProcess {}),
+            connector: Box::new(WmiImplant{ computer: remote_computer }),
+            run_implicit: true
+        }
+    }
+
+    pub fn wmic(
+        remote_computer: Computer,
+        local_store_directory: &'a Path,
+    )-> CommandRunner<'a>{
+        CommandRunner{
+            local_store_directory,
+            connector: Box::new(WmiProcess { computer: remote_computer }),
             run_implicit: false
         }
     }
 
     pub fn local(
-        remote_computer: &'a Computer,
         local_store_directory: &'a Path,
     )-> CommandRunner<'a>{
         CommandRunner{
-            remote_computer,
             local_store_directory,
             connector: Box::new(Local::new()),
             run_implicit: true
@@ -49,46 +56,48 @@ impl<'a> CommandRunner<'a> {
     }
 
     pub fn psremote(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         local_store_directory: &'a Path,
     )-> CommandRunner<'a>{
         CommandRunner{
-            remote_computer,
             local_store_directory,
-            connector: Box::new(PsRemote{}),
+            connector: Box::new(PsRemote{ computer: remote_computer }),
             run_implicit: true
         }
     }
 
     pub fn rdp(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         local_store_directory: &'a Path,
-        nla: bool
+        nla: bool,
+        connection_time: Option<Duration>
     )-> CommandRunner<'a>{
         CommandRunner{
-            remote_computer,
             local_store_directory,
-            connector: Box::new(Rdp{ nla }),
+            connector: Box::new(Rdp{
+                computer: remote_computer,
+                nla,
+                connection_time
+            }),
             run_implicit: true
         }
     }
 
     pub fn ssh(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         local_store_directory: &'a Path,
         key_file: Option<PathBuf>
     )-> CommandRunner<'a>{
         CommandRunner{
-            remote_computer,
             local_store_directory,
-            connector: Box::new(Ssh{ key_file }),
+            connector: Box::new(Ssh{ key_file, computer: remote_computer }),
             run_implicit: false
         }
     }
 
     pub fn run_commands(
         &self,
-        command_file: &Path
+        command_file: &Path,
     ) {
         let file = match File::open(command_file) {
             Ok(file) => file,
@@ -141,11 +150,11 @@ impl<'a> CommandRunner<'a> {
             let report_filename_prefix = format!("custom-{}", command_joined);
 
             let remote_connection = Command::new(
-                &self.remote_computer,
                 command,
                 Some(&self.local_store_directory),
                 &report_filename_prefix,
-                elevated
+                elevated,
+                None
             );
             match self.connector.connect_and_run_command(remote_connection) {
                 Ok(_) => {}

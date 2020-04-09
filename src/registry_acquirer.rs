@@ -1,5 +1,5 @@
 use std::path::Path;
-use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Rdp, RemoteCopier, XCopy, PsCopy, WindowsRemoteCopier, RdpCopy};
+use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Rdp, RemoteCopier, XCopy, PsCopy, WindowsRemoteCopier, WmiImplant};
 use crate::process_runner::create_report_path;
 use std::thread;
 use std::time::Duration;
@@ -15,6 +15,8 @@ pub struct RegistryAcquirer<'a> {
     registry_hkcr_command: Vec<String>,
     registry_hku_command: Vec<String>,
     registry_hkcc_command: Vec<String>,
+
+    timeout: Option<Duration>
 }
 
 impl<'a> RegistryAcquirer<'a> {
@@ -23,6 +25,7 @@ impl<'a> RegistryAcquirer<'a> {
         store_directory: &'a Path,
         connector: Box<dyn Connector>,
         copier: Box<dyn RemoteCopier>,
+        timeout: Option<Duration>
     ) -> RegistryAcquirer<'a> {
         RegistryAcquirer {
             remote_computer,
@@ -54,38 +57,43 @@ impl<'a> RegistryAcquirer<'a> {
                 "export".to_string(),
                 "HKCC".to_string(),
             ],
+            timeout
         }
     }
 
     pub fn psexec(
         remote_computer: &'a Computer,
         store_directory: &'a Path,
+        timeout: Option<Duration>
     ) -> RegistryAcquirer<'a> {
         RegistryAcquirer::new_standard_acquirer(
             remote_computer,
             store_directory,
-            Box::new(PsExec {}),
+            Box::new(PsExec { computer: remote_computer.clone() }),
             Box::new(
                 WindowsRemoteCopier::new(
                     remote_computer.clone(),
                     Box::new(XCopy {}),
                 )
             ),
+            timeout
         )
     }
 
     pub fn psremote(
         remote_computer: &'a Computer,
         store_directory: &'a Path,
+        timeout: Option<Duration>
     ) -> RegistryAcquirer<'a> {
         RegistryAcquirer::new_standard_acquirer(
             remote_computer,
             store_directory,
-            Box::new(PsRemote {}),
+            Box::new(PsRemote { computer: remote_computer.clone() }),
             Box::new(WindowsRemoteCopier::new(
                 remote_computer.clone(),
                 Box::new(PsCopy {}),
             )),
+            timeout
         )
     }
 
@@ -93,25 +101,51 @@ impl<'a> RegistryAcquirer<'a> {
     pub fn local(
         remote_computer: &'a Computer,
         store_directory: &'a Path,
+        timeout: Option<Duration>
     ) -> RegistryAcquirer<'a> {
         RegistryAcquirer::new_standard_acquirer(
             remote_computer,
             store_directory,
             Box::new(Local::new()),
             Box::new(Local::new()),
+            timeout
+        )
+    }
+
+    pub fn wmi(
+        remote_computer: &'a Computer,
+        store_directory: &'a Path,
+        timeout: Option<Duration>
+    ) -> RegistryAcquirer<'a> {
+        RegistryAcquirer::new_standard_acquirer(
+            remote_computer,
+            store_directory,
+            Box::new(WmiImplant { computer: remote_computer.clone() }),
+            Box::new(WmiImplant { computer: remote_computer.clone() }),
+            timeout
         )
     }
 
     pub fn rdp(
         remote_computer: &'a Computer,
         store_directory: &'a Path,
-        nla: bool
+        nla: bool,
+        timeout: Option<Duration>
     ) -> RegistryAcquirer<'a> {
         RegistryAcquirer::new_standard_acquirer(
             remote_computer,
             store_directory,
-            Box::new(Rdp { nla }),
-            Box::new(RdpCopy { computer: remote_computer.clone(), nla }),
+            Box::new(Rdp {
+                nla,
+                connection_time: timeout.clone(),
+                computer: remote_computer.clone(),
+            }),
+            Box::new(Rdp {
+                computer: remote_computer.clone(),
+                nla,
+                connection_time: timeout.clone()
+            }),
+            timeout
         )
     }
 
@@ -135,11 +169,11 @@ impl<'a> RegistryAcquirer<'a> {
         command.push(remote_report_path.clone());
         command.push("/y".to_string());
         let remote_connection = Command::new(
-            &self.remote_computer,
             command,
             None,
             report_filename_prefix,
-            false
+            false,
+            self.timeout.clone()
         );
 
         info!("{}: Checking {}",
@@ -157,7 +191,7 @@ impl<'a> RegistryAcquirer<'a> {
                 )
             }
         }
-        thread::sleep(Duration::from_millis(60_000));
+        thread::sleep(Duration::from_millis(20_000));
         match self.copier.copy_from_remote(Path::new(&remote_report_path), report_path.parent().unwrap()) {
             Ok(_) => {}
             Err(err) => {
@@ -169,7 +203,7 @@ impl<'a> RegistryAcquirer<'a> {
                 )
             }
         }
-        thread::sleep(Duration::from_millis(30_000));
+        thread::sleep(Duration::from_millis(20_000));
         match self.copier.delete_remote_file(Path::new(&remote_report_path)) {
             Ok(_) => {}
             Err(err) => {
