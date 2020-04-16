@@ -1,6 +1,9 @@
-use crate::remote::{Connector, Computer, Copier, XCopy, RemoteCopier};
+use crate::remote::{Connector, Computer, FileHandler, RemoteFileHandler, Command};
 use std::path::{Path, PathBuf};
-use std::io;
+use std::{io, fs};
+use std::time::Duration;
+use fs_extra::dir::CopyOptions;
+use std::io::ErrorKind;
 
 pub struct Local {
     localhost: Computer
@@ -24,25 +27,58 @@ impl Connector for Local {
         return "LOCAL";
     }
 
+    fn computer(&self) -> &Computer {
+        &self.localhost
+    }
+
+    fn copier(&self) -> &dyn RemoteFileHandler {
+        self as &dyn RemoteFileHandler
+    }
+
     fn prepare_command(&self,
-                       _remote_computer: &Computer,
                        command: Vec<String>,
                        _output_file_path: Option<String>,
                        _elevated: bool,
     ) -> Vec<String> {
         command
     }
+
+    fn connect_and_run_local_program(
+        &self,
+        command_to_run: Command<'_>,
+        timeout: Option<Duration>
+    ) -> io::Result<()> {
+        self.connect_and_run_command(command_to_run, timeout)
+    }
 }
 
-impl Copier for Local {
+impl FileHandler for Local {
     fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
-        let xcopy = XCopy {};
-        xcopy.copy_file(source, target)
+        if source.is_file() {
+            let target = if target.is_file() {
+                target.to_path_buf()
+            } else {
+                target.join(source.file_name().unwrap())
+            };
+            fs::copy(source, &target)?;
+        } else {
+            if !target.exists() {
+                fs::create_dir_all(target)?;
+            }
+            let mut options = CopyOptions::new();
+            options.copy_inside = true;
+            options.overwrite = true;
+            fs_extra::dir::copy(source, target, &options).map_err(|err| io::Error::new(ErrorKind::Other, err))?;
+        }
+        Ok(())
     }
 
     fn delete_file(&self, target: &Path) -> io::Result<()> {
-        let xcopy = XCopy {};
-        xcopy.delete_file(target)
+        if target.is_file() {
+            fs::remove_file(target)
+        } else {
+            fs::remove_dir_all(target)
+        }
     }
 
     fn method_name(&self) -> &'static str {
@@ -50,12 +86,12 @@ impl Copier for Local {
     }
 }
 
-impl RemoteCopier for Local {
-    fn computer(&self) -> &Computer {
+impl RemoteFileHandler for Local {
+    fn remote_computer(&self) -> &Computer {
         &self.localhost
     }
 
-    fn copier_impl(&self) -> &dyn Copier {
+    fn copier_impl(&self) -> &dyn FileHandler {
         self
     }
 

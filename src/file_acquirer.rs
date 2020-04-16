@@ -1,4 +1,4 @@
-use crate::remote::RemoteCopier;
+use crate::remote::RemoteFileHandler;
 use std::path::Path;
 use std::io;
 use std::fs::File;
@@ -6,7 +6,7 @@ use std::io::{BufReader, BufRead};
 
 pub fn download_files(file_list: &Path,
                       local_store_directory: &Path,
-                      downloader: &dyn RemoteCopier,
+                      downloader: &dyn RemoteFileHandler,
 ) -> io::Result<()> {
     let input_file = File::open(file_list)?;
     let local_store_directory = dunce::canonicalize(local_store_directory)

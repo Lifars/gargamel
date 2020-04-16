@@ -29,3 +29,7 @@ pub use self::rdp::*;
 pub mod copier;
 
 pub use self::copier::*;
+
+pub mod archiver;
+
+pub use self::archiver::*;

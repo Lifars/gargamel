@@ -1,5 +1,0 @@
-# Commands to run
-# Examples:
-
-ipconfig
-:psexec:psrem ipconfig -all

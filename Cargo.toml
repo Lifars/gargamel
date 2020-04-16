@@ -29,3 +29,4 @@ uuid = { version = "0.8", features = ["v4"] }
 dunce = "1.0.0"
 wait-timeout = "0.2.0"
 rpassword = "4.0.5"
+fs_extra = "1.1"

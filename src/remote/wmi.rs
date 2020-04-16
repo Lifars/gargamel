@@ -1,68 +1,174 @@
-use crate::remote::{Connector, Computer};
+use crate::remote::{Connector, Computer, FileHandler, RemoteFileHandler};
+use std::path::{Path, PathBuf};
+use std::io;
+use crate::process_runner::{run_process_blocking_maybe_timed, run_process_blocking_timed};
+use std::time::Duration;
 
-pub struct Wmi {}
+pub struct Wmi {
+    pub computer: Computer,
+}
 
 impl Connector for Wmi {
     fn connect_method_name(&self) -> &'static str {
-        return "WMI";
+        "WMI"
+    }
+
+    fn computer(&self) -> &Computer {
+        &self.computer
+    }
+
+    fn copier(&self) -> &dyn RemoteFileHandler {
+        self as &dyn RemoteFileHandler
     }
 
     fn prepare_command(&self,
-                       remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
                        _elevated: bool,
     ) -> Vec<String> {
-        let program_name = "wmic.exe".to_string();
+        let remote_computer = self.remote_computer();
+        let program_name = "powershell.exe".to_string();
+        // let wmi_implant = std::env::current_dir()
+        //     .expect("Cannot get current working directory")
+        //     .join("WMImplant.ps1")
+        //     .to_string_lossy().to_string();
+        let command_joined: String = command.join(" ");
+        let mut prepared_command = vec![
+            program_name,
+            "-File".to_string(),
+            "WMImplant.ps1".to_string(),
+            "-ComputerName".to_string(),
+            remote_computer.address.clone(),
+            "-RemoteUser".to_string(),
+            remote_computer.domain_username(),
+            "-CommandExec".to_string(),
+            "-RemoteCommand".to_string(),
+            format!("{}", command_joined),
+        ];
 
-        let address = format!("/NODE:{}", remote_computer.address);
-        let username = remote_computer.domain_username();
-        let user = format!("/USER:{}", username);
-
-        let mut final_command = vec![program_name];
-        if let Some(output_file_path) = output_file_path {
-            final_command.push(format!("/OUTPUT:{}", output_file_path));
-        }
-        final_command.push(address);
-        final_command.push(user);
         if let Some(password) = &remote_computer.password {
-            final_command.push(format!("/PASSWORD:{}", password));
+            prepared_command.push("-RemotePass".to_string());
+            prepared_command.push(password.clone());
         }
-        final_command.extend(command.into_iter());
-        final_command
+        match output_file_path {
+            None => prepared_command,
+            Some(output_file_path) => {
+                prepared_command.push(">".to_string());
+                prepared_command.push(output_file_path);
+                prepared_command
+            }
+        }
     }
 }
 
-pub struct WmiProcess {}
+impl Wmi {
+    fn copy_impl(&self,
+                 source: &Path,
+                 target: &Path,
+                 method_name: &str,
+                 target_is_remote: bool,
+    ) -> io::Result<()>{
+        let remote_computer = self.remote_computer();
 
-impl Connector for WmiProcess {
-    fn connect_method_name(&self) -> &'static str {
-        return "WMI";
+        let target = match source.file_name() {
+            None => target.to_path_buf(),
+            Some(file_name) => target.join(file_name),
+        };
+
+        let mut prepared_command = vec![
+            "-File".to_string(),
+            "WMImplant.ps1".to_string(),
+            method_name.to_string(),
+            "-ComputerName".to_string(),
+            remote_computer.address.clone(),
+            "-RemoteUser".to_string(),
+            remote_computer.domain_username()
+        ];
+
+        if target_is_remote {
+            prepared_command.push("-RemoteFile".to_string());
+            prepared_command.push(target.to_string_lossy().to_string());
+            prepared_command.push("-LocalFile".to_string());
+            prepared_command.push(source.to_string_lossy().to_string());
+        } else {
+            prepared_command.push("-RemoteFile".to_string());
+            prepared_command.push(source.to_string_lossy().to_string());
+            prepared_command.push("-LocalFile".to_string());
+            prepared_command.push(target.to_string_lossy().to_string());
+        }
+
+        if let Some(password) = &remote_computer.password {
+            prepared_command.push("-RemotePass".to_string());
+            prepared_command.push(password.clone());
+        }
+
+        run_process_blocking_maybe_timed(
+            "powershell.exe",
+            &prepared_command,
+            None
+        )
+    }
+}
+
+impl FileHandler for Wmi {
+    fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
+        self.copy_impl(source, target, "-Copy", true)
     }
 
-    fn prepare_command(&self,
-                       remote_computer: &Computer,
-                       command: Vec<String>,
-                       _output_file_path: Option<String>,
-                       _elevated: bool,
-    ) -> Vec<String> {
-        let program_name = "wmic.exe".to_string();
+    fn delete_file(&self, target: &Path) -> io::Result<()> {
+        let remote_computer = self.remote_computer();
 
-        let address = format!("/NODE:{}", remote_computer.address);
-        let username = remote_computer.domain_username();
-        let user = format!("/USER:{}", username);
+        let mut prepared_command = vec![
+            "-File".to_string(),
+            "WMImplant.ps1".to_string(),
+            "-Delete".to_string(),
+            "-LocalFile".to_string(),
+            target.to_string_lossy().to_string(),
+            "-ComputerName".to_string(),
+            remote_computer.address.clone(),
+            "-RemoteUser".to_string(),
+            remote_computer.domain_username()
+        ];
 
-        let mut final_command = vec![program_name];
-        final_command.push(address);
-        final_command.push(user);
         if let Some(password) = &remote_computer.password {
-            final_command.push(format!("/PASSWORD:{}", password));
+            prepared_command.push("-RemotePass".to_string());
+            prepared_command.push(password.clone());
         }
-        final_command.push("process".to_string());
-        final_command.push("call".to_string());
-        final_command.push("create".to_string());
 
-        final_command.extend(command.into_iter());
-        final_command
+        run_process_blocking_timed(
+            "powershell.exe",
+            &prepared_command,
+            Duration::from_secs(10)
+        )
+    }
+
+    fn method_name(&self) -> &'static str {
+        self.connect_method_name()
+    }
+}
+
+impl RemoteFileHandler for Wmi {
+    fn remote_computer(&self) -> &Computer {
+        self.computer()
+    }
+
+    fn copier_impl(&self) -> &dyn FileHandler {
+        self as &dyn FileHandler
+    }
+
+    fn path_to_remote_form(&self, path: &Path) -> PathBuf {
+        path.to_path_buf()
+    }
+
+    fn copy_to_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
+        self.copy_impl(source, target, "-Upload", true)
+    }
+
+    fn delete_remote_file(&self, target: &Path) -> io::Result<()> {
+        self.delete_file(target)
+    }
+
+    fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
+        self.copy_impl(source, target, "-Download", false)
     }
 }

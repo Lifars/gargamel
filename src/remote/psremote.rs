@@ -1,21 +1,40 @@
-use crate::remote::{Connector, Computer, Copier};
+use crate::remote::{Connector, Computer, FileHandler, RemoteFileHandler, WindowsRemoteFileHandler};
 use std::path::Path;
 use std::io;
 use crate::process_runner::run_process_blocking;
 
-pub struct PsRemote {}
+pub struct PsRemote {
+    computer: Computer,
+    copier: WindowsRemoteFileHandler,
+}
 
+impl PsRemote {
+    pub fn new(computer: Computer) -> PsRemote {
+        PsRemote {
+            computer: computer.clone(),
+            copier: WindowsRemoteFileHandler::new(computer, Box::new(Powershell {})),
+        }
+    }
+}
 impl Connector for PsRemote {
     fn connect_method_name(&self) -> &'static str {
         return "PSREM";
     }
 
+    fn computer(&self) -> &Computer {
+        &self.computer
+    }
+
+    fn copier(&self) -> &dyn RemoteFileHandler {
+        &self.copier
+    }
+
     fn prepare_command(&self,
-                       remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
-                       elevated: bool,
+                       _elevated: bool,
     ) -> Vec<String> {
+        let remote_computer = self.computer();
         let program_name = "powershell.exe".to_string();
         let mut prepared_command = vec![
             program_name,
@@ -26,14 +45,14 @@ impl Connector for PsRemote {
             "-ScriptBlock".to_string(),
             "{".to_string(),
         ];
-        if elevated {
-            prepared_command.push("start-process".to_string());
-            prepared_command.push(format!("'{}'", command[0].clone()));
-            prepared_command.push("-argumentlist".to_string());
-            prepared_command.push(format!("'{}'", command[1..].join(" ")));
-        } else {
+//        if elevated {
+//            prepared_command.push("start-process".to_string());
+//            prepared_command.push(format!("'{}'", command[0].clone()));
+//            prepared_command.push("-argumentlist".to_string());
+//            prepared_command.push(format!("'{}'", command[1..].join(" ")));
+//        } else {
             prepared_command.extend(command);
-        }
+//        }
         let username = remote_computer.domain_username();
         let credential = match &remote_computer.password {
             None => username,
@@ -58,9 +77,9 @@ impl Connector for PsRemote {
     }
 }
 
-pub struct PsCopy {}
+pub struct Powershell {}
 
-impl Copier for PsCopy {
+impl FileHandler for Powershell {
     fn copy_file(
         &self,
         source: &Path,
@@ -90,6 +109,6 @@ impl Copier for PsCopy {
     }
 
     fn method_name(&self) -> &'static str {
-        "PowerShell"
+        "PSCOPY"
     }
 }

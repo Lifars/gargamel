@@ -1,8 +1,7 @@
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Wmi, Ssh, Rdp};
+use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Local, Ssh, Rdp, Wmi};
 
 pub struct EvidenceAcquirer<'a> {
-    remote_computer: &'a Computer,
     store_directory: &'a Path,
     connector: Box<dyn Connector>,
 
@@ -17,12 +16,10 @@ pub struct EvidenceAcquirer<'a> {
 
 impl<'a> EvidenceAcquirer<'a> {
     fn new_standard_acquirer(
-        remote_computer: &'a Computer,
         store_directory: &'a Path,
         remote_connector: Box<dyn Connector>,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer {
-            remote_computer,
             store_directory,
             connector: remote_connector,
             firewall_state_command: Some(vec![
@@ -61,104 +58,70 @@ impl<'a> EvidenceAcquirer<'a> {
     }
 
     pub fn psexec(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         store_directory: &'a Path,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
-            remote_computer,
             store_directory,
-            Box::new(PsExec {}),
+            Box::new(PsExec::paexec(remote_computer)),
         )
     }
 
     pub fn psremote(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         store_directory: &'a Path,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
-            remote_computer,
             store_directory,
-            Box::new(PsRemote {}),
+            Box::new(PsRemote::new(remote_computer)),
         )
     }
 
     pub fn local(
-        remote_computer: &'a Computer,
         store_directory: &'a Path,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
-            remote_computer,
             store_directory,
             Box::new(Local::new()),
         )
     }
 
     pub fn wmi(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         store_directory: &'a Path,
     ) -> EvidenceAcquirer<'a> {
-        EvidenceAcquirer {
-            remote_computer,
+        EvidenceAcquirer::new_standard_acquirer(
             store_directory,
-            connector: Box::new(Wmi{}),
-            firewall_state_command: None,
-            network_state_command: Some(vec![
-                "nic".to_string(),
-                "get".to_string(),
-                "AdapterType,".to_string(),
-                "Name,".to_string(),
-                "Installed,".to_string(),
-                "MACAddress,".to_string(),
-                "PowerManagementSupported,".to_string(),
-                "Speed".to_string(),
-            ]),
-            logged_users_command: Some(vec![
-                "COMPUTERSYSTEM".to_string(),
-                "GET".to_string(),
-                "USERNAME".to_string(),
-            ]),
-            running_processes_command: Some(vec![
-                "process".to_string(),
-            ]),
-            active_network_connections_command: Some(vec![
-                "netuse".to_string(),
-            ]),
-            system_event_logs_command: Some(vec![
-                "NTEVENT".to_string(),
-                "WHERE".to_string(),
-                "LogFile='system".to_string(),
-            ]),
-            application_event_logs_command: Some(vec![
-                "NTEVENT".to_string(),
-                "WHERE".to_string(),
-                "LogFile='application".to_string(),
-            ]),
-        }
+            Box::new(Wmi {
+                computer: remote_computer,
+            }),
+        )
     }
 
     pub fn rdp(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         store_directory: &'a Path,
-        nla: bool
+        nla: bool,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
-            remote_computer,
             store_directory,
-            Box::new(Rdp { nla }),
+            Box::new(Rdp {
+                nla,
+                computer: remote_computer
+            }),
         )
     }
 
     pub fn ssh(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         store_directory: &'a Path,
         key_file: Option<PathBuf>
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer {
-            remote_computer,
             store_directory,
-            connector: Box::new(Ssh{ key_file }),
+            connector: Box::new(Ssh{ key_file, computer: remote_computer.clone() }),
             firewall_state_command: Some(vec![
-                format!("echo {} | sudo -S iptables -L", remote_computer.password.clone().unwrap_or_default()),
+                format!("echo {} | sudo -S iptables -L", remote_computer.password.unwrap_or_default()),
             ]),
             network_state_command: Some(vec![
                 "ifconfig".to_string(),
@@ -188,11 +151,10 @@ impl<'a> EvidenceAcquirer<'a> {
             return;
         }
         let remote_connection = Command::new(
-            &self.remote_computer,
             command.to_vec(),
             Some(&self.store_directory),
             report_filename_prefix,
-            false
+            false,
         );
 
         info!("{}: Checking {}",
@@ -200,7 +162,7 @@ impl<'a> EvidenceAcquirer<'a> {
               report_filename_prefix.replace("_", " ")
         );
 
-        match self.connector.connect_and_run_command(remote_connection) {
+        match self.connector.connect_and_run_command(remote_connection, None) {
             Ok(_) => {}
             Err(err) => { error!("Error running command {:?}. Cause: {}", command, err) }
         }

@@ -50,22 +50,35 @@ pub struct Opts {
     short = "s",
     long = "search",
     help = "Optional: File with files names to be searched on remote computer. \
-    Supports also `*` and `?` wildcards."
+    File names supports also `*` and `?` wildcards."
     )]
     pub search_files_path: Option<String>,
 
+    #[clap(
+    long = "no-evidence-search",
+    help = "Disables standard evidence search & registry acquire"
+    )]
+    pub disable_evidence_download: bool,
+
+
     #[clap(short = "a", long = "all")]
     pub all: bool,
+
     #[clap(long = "wmi")]
     pub wmi: bool,
+
     #[clap(long = "rdp")]
     pub rdp: bool,
+
     #[clap(long = "psexec")]
     pub psexec: bool,
+
     #[clap(long = "psrem")]
     pub psrem: bool,
+
     #[clap(long = "ssh")]
     pub ssh: bool,
+
     #[clap(long = "local")]
     pub local: bool,
 
@@ -77,11 +90,18 @@ pub struct Opts {
     pub image_memory: Option<String>,
 
     #[clap(
-    long = "mem-image-rdp-wait",
-    help = "Optional: How long should wait before downloading mem image using rdp. Default is 5 (minutes)",
-    default_value = "5",
+    long = "timeout",
+    help = "Optional: Timeout of long running operations. Default is 300 (seconds)",
+    default_value = "300",
     )]
-    pub rdp_wait_time: u64,
+    pub timeout: u64,
+
+    #[clap(
+    long = "compress_timeout",
+    help = "Optional: Timeout of memory image compression running operations. Default is 400 (seconds). Should be around `target_mem_size_in_mb/5`",
+    default_value = "400",
+    )]
+    pub compress_timeout: u64,
 
     #[clap(long = "key", help = "Optional: SSH private key file")]
     pub ssh_key: Option<String>,

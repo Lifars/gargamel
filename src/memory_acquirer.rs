@@ -1,84 +1,74 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, RemoteCopier, XCopy, PsCopy, WindowsRemoteCopier, RdpCopy, Rdp};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileHandler, Compression};
 use std::path::Path;
 use std::{io, thread};
 use std::time::Duration;
 
 pub struct MemoryAcquirer<'a> {
-    pub computer: &'a Computer,
     pub local_store_directory: &'a Path,
     pub connector: Box<dyn Connector>,
-    pub copier_factory: Box<dyn Fn(Computer, bool) -> Box<dyn RemoteCopier>>,
-    pub manual_wait: Option<Duration>,
-    pub nla: bool
+    pub image_timeout: Option<Duration>,
+    pub compress_timeout: Option<Duration>,
+    pub compression: Compression,
 }
 
 impl<'a> MemoryAcquirer<'a> {
     pub fn psexec(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         local_store_directory: &'a Path,
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
-            computer: remote_computer,
             local_store_directory,
-            connector: Box::new(PsExec {}),
-            copier_factory: Box::new(|computer: Computer, _nla: bool|
-                Box::new(WindowsRemoteCopier::new(
-                    computer,
-                    Box::new(XCopy {}),
-                ))),
-            manual_wait: None,
-            nla: false
+            connector: Box::new(PsExec::psexec(remote_computer)),
+            image_timeout: None,
+            compress_timeout: None,
+            compression: Compression::Yes,
         }
     }
 
-    // pub fn wmi(
-    //     remote_computer: Computer,
-    //     local_store_directory: PathBuf,
-    // )-> MemoryAcquirer{
-    //     MemoryAcquirer{
-    //         remote_computer,
-    //         local_store_directory,
-    //         connector: Box::new(WmiProcess {})
-    //     }
-    // }
-
     pub fn psremote(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         local_store_directory: &'a Path,
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
-            computer: remote_computer,
             local_store_directory,
-            connector: Box::new(PsRemote {}),
-            copier_factory: Box::new(|computer: Computer, _nla: bool|
-                Box::new(WindowsRemoteCopier::new(
-                    computer,
-                    Box::new(PsCopy {}),
-                ))
-            ),
-            manual_wait: None,
-            nla: false
+            connector: Box::new(PsRemote::new(remote_computer)),
+            image_timeout: None,
+            compress_timeout: None,
+            compression: Compression::No,
+        }
+    }
+
+    pub fn wmi(
+        remote_computer: Computer,
+        local_store_directory: &'a Path,
+        timeout: Duration,
+        compress_timeout: Duration
+    ) -> MemoryAcquirer<'a> {
+        MemoryAcquirer {
+            local_store_directory,
+            connector: Box::new(Wmi { computer: remote_computer.clone(), }),
+            image_timeout: Some(timeout),
+            compress_timeout: Some(compress_timeout),
+            compression: Compression::YesSplit,
         }
     }
 
     pub fn rdp(
-        remote_computer: &'a Computer,
+        remote_computer: Computer,
         local_store_directory: &'a Path,
-        manual_wait: Duration,
-        nla: bool
+        nla: bool,
+        image_timeout: Duration,
+        compress_timeout: Duration
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
-            computer: remote_computer,
             local_store_directory,
-            connector: Box::new(Rdp { nla }),
-            copier_factory: Box::new(|computer: Computer, nla: bool|
-                Box::new(RdpCopy {
-                    computer,
-                    nla
-                })
-            ),
-            manual_wait: Some(manual_wait),
-            nla
+            connector: Box::new(Rdp {
+                nla,
+                computer: remote_computer.clone(),
+            }),
+            image_timeout: Some(image_timeout),
+            compress_timeout: Some(compress_timeout),
+            compression: Compression::YesSplit,
         }
     }
 
@@ -90,77 +80,76 @@ impl<'a> MemoryAcquirer<'a> {
             .expect("Cannot open current working directory")
             .join(self.local_store_directory);
         let winpmem = "winpmem.exe";
-        let source_winpmem = std::env::current_dir()?.join(winpmem);
+
         let target_name = match target_name.parent() {
             None => Path::new("C:\\Users\\Public").join(target_name),
             Some(_) => target_name.to_owned(),
         };
+
         let target_store = target_name.parent().unwrap();
-        let target_winpmem = target_store.join(winpmem);
-        let remote_copier = self.copier_factory.as_ref()(
-            self.computer.clone(),
-            self.nla
-        );
-        remote_copier.copy_to_remote(
-            &source_winpmem,
-            &target_store,
-        )?;
-        trace!("Winpmem target path: {:#?}", target_winpmem);
         let connection = Command {
-            remote_computer: &self.computer,
             command: vec![
-                target_winpmem.to_string_lossy().to_string(),
+                winpmem.to_string(),
                 "--format".to_string(),
                 "map".to_string(),
                 "-t".to_string(),
                 "-o".to_string(),
                 target_name.to_string_lossy().to_string(),
             ],
-            store_directory: None,
+            report_store_directory: None,
             report_filename_prefix: "mem-ack-log",
-            elevated: true
+            elevated: true,
         };
-        self.connector.connect_and_run_command(connection)?;
-        if self.manual_wait.is_some() {
-            thread::sleep(self.manual_wait.unwrap());
-        }
-        match remote_copier.copy_from_remote(
+        self.connector.connect_and_run_local_program_in_current_directory(
+            connection,
+            self.image_timeout
+        )?;
+        let _copier = self.connector.copier();
+        let _compression_split_copier = CompressCopier::new(self.connector.as_ref(), true, self.compress_timeout);
+        let _compression_copier = CompressCopier::new(self.connector.as_ref(), false, self.compress_timeout);
+        let copier = match self.compression {
+            Compression::No => _copier,
+            Compression::Yes => &_compression_copier as &dyn RemoteFileHandler,
+            Compression::YesSplit => &_compression_split_copier as &dyn RemoteFileHandler,
+        };
+        match copier.copy_from_remote(
             &target_name,
             &local_store_directory,
             // &self.local_store_directory.join(target_name.file_name().unwrap()),
-        ){
+        ) {
             Ok(_) => {}
             Err(err) => {
                 error!("Cannot download {} report from {} using method {} due to {}",
                        target_name.display(),
-                       self.computer.address,
+                       self.connector.computer().address,
                        self.connector.connect_method_name(),
                        err
                 )
             }
         }
-        // thread::sleep(Duration::from_millis(1000));
-        // match remote_copier.delete_remote_file(&target_winpmem) {
-        //     Ok(_) => {}
-        //     Err(err) => {
-        //         error!("Cannot delete remote file {} using method {} due to {}",
-        //                target_name.display(),
-        //                self.connector.connect_method_name(),
-        //                err
-        //         )
-        //     }
-        // };
-        // thread::sleep(Duration::from_millis(1000));
-        // match remote_copier.delete_remote_file(&target_name) {
-        //     Ok(_) => {}
-        //     Err(err) => {
-        //         error!("Cannot delete remote file {} using method {} due to {}",
-        //                target_name.display(),
-        //                self.connector.connect_method_name(),
-        //                err
-        //         )
-        //     }
-        // };
+        thread::sleep(Duration::from_millis(1000));
+        let winpem_path = target_store.join(winpmem);
+        match copier.delete_remote_file(&winpem_path) {
+            Ok(_) => {}
+            Err(err) => {
+                error!("Cannot delete remote file {} using method {} due to {}",
+                       winpem_path.display(),
+                       self.connector.connect_method_name(),
+                       err
+                )
+            }
+        };
+        thread::sleep(Duration::from_millis(1000));
+        match copier.delete_remote_file(&target_name) {
+            Ok(_) => {}
+            Err(err) => {
+                error!("Cannot delete remote file {} using method {} due to {}",
+                       target_name.display(),
+                       self.connector.connect_method_name(),
+                       err
+                )
+            }
+        };
         Ok(())
     }
 }

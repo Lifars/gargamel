@@ -1,20 +1,66 @@
-use crate::remote::{Connector, Computer};
+use crate::remote::{Connector, Computer, Command, RemoteFileHandler, Cmd, WindowsRemoteFileHandler};
+use std::time::Duration;
+use std::io::Error;
 
-pub struct PsExec {}
+pub struct PsExec {
+    computer: Computer,
+    copier: WindowsRemoteFileHandler,
+    psexec_name: String
+}
+
+impl PsExec {
+    pub fn paexec(computer: Computer) -> PsExec {
+        PsExec {
+            computer: computer.clone(),
+            copier: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            psexec_name: "paexec.exe".to_string()
+        }
+    }
+
+    pub fn psexec(computer: Computer) -> PsExec {
+        PsExec {
+            computer: computer.clone(),
+            copier: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            psexec_name: "PsExec64.exe".to_string()
+        }
+    }
+}
 
 impl Connector for PsExec {
     fn connect_method_name(&self) -> &'static str {
         return "PSEXEC";
     }
 
+    fn computer(&self) -> &Computer {
+        &self.computer
+    }
+
+    fn copier(&self) -> &dyn RemoteFileHandler {
+        &self.copier
+    }
+
+    fn connect_and_run_local_program(&self,
+                                     command_to_run: Command<'_>,
+                                     timeout: Option<Duration>
+    ) -> Result<(), Error> {
+        let mut command = command_to_run.command;
+        command.insert(0, "-c".to_string());
+        command.insert(0, "-f".to_string());
+        let command_to_run = Command {
+            command,
+            ..command_to_run
+        };
+        self.connect_and_run_command(command_to_run, timeout)
+    }
+
     fn prepare_command(&self,
-                       remote_computer: &Computer,
                        command: Vec<String>,
                        output_file_path: Option<String>,
-                       elevated: bool
+                       elevated: bool,
     ) -> Vec<String> {
+        let remote_computer = self.computer();
         let address = format!("\\\\{}", remote_computer.address);
-        let program_name = "paexec.exe".to_string();
+        let program_name = self.psexec_name.clone();
         let mut prepared_command = vec![
             program_name,
             address,

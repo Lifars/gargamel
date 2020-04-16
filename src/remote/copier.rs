@@ -3,7 +3,7 @@ use crate::remote::Computer;
 use std::io;
 use crate::process_runner::run_process_blocking;
 
-pub trait Copier {
+pub trait FileHandler {
     fn copy_file(
         &self,
         source: &Path,
@@ -17,9 +17,9 @@ pub trait Copier {
     fn method_name(&self) -> &'static str;
 }
 
-pub struct XCopy {}
+pub struct Cmd {}
 
-impl Copier for XCopy {
+impl FileHandler for Cmd {
     fn copy_file(
         &self,
         source: &Path,
@@ -40,7 +40,8 @@ impl Copier for XCopy {
 
     fn delete_file(&self, target: &Path) -> io::Result<()> {
         let args = vec![
-            "/f".to_string(),
+            "/F".to_string(),
+            "/Q".to_string(),
             target.to_string_lossy().to_string(),
         ];
         run_process_blocking(
@@ -54,9 +55,9 @@ impl Copier for XCopy {
     }
 }
 
-pub trait RemoteCopier {
-    fn computer(&self) -> &Computer;
-    fn copier_impl(&self) -> &dyn Copier;
+pub trait RemoteFileHandler {
+    fn remote_computer(&self) -> &Computer;
+    fn copier_impl(&self) -> &dyn FileHandler;
 
     fn path_to_remote_form(
         &self,
@@ -85,18 +86,18 @@ pub trait RemoteCopier {
 }
 
 /// Use factory mathods to properly initialize the struct.
-pub struct WindowsRemoteCopier {
+pub struct WindowsRemoteFileHandler {
     computer: Computer,
-    copier_impl: Box<dyn Copier>,
+    copier_impl: Box<dyn FileHandler>,
 }
 
-impl Drop for WindowsRemoteCopier {
+impl Drop for WindowsRemoteFileHandler {
     fn drop(&mut self) {
         run_process_blocking(
             "NET",
             &[
                 "USE".to_string(),
-                format!("\\\\{}\\IPC$", self.computer.address),
+                format!("\\\\{}", self.computer.address),
                 // format!("\\\\{}", self.computer.address),
                 "/D".to_string()
             ],
@@ -106,11 +107,11 @@ impl Drop for WindowsRemoteCopier {
     }
 }
 
-impl WindowsRemoteCopier {
+impl WindowsRemoteFileHandler {
     pub fn new(
         computer: Computer,
-        copier_impl: Box<dyn Copier>,
-    ) -> WindowsRemoteCopier {
+        copier_impl: Box<dyn FileHandler>,
+    ) -> WindowsRemoteFileHandler {
         let mut args = vec![
             "USE".to_string(),
             format!("\\\\{}", computer.address),
@@ -126,16 +127,16 @@ impl WindowsRemoteCopier {
         ).expect(&format!(
             "Cannot establish connection using \"net use\" to {}", &computer.address
         ));
-        WindowsRemoteCopier { computer, copier_impl }
+        WindowsRemoteFileHandler { computer, copier_impl }
     }
 }
 
-impl RemoteCopier for WindowsRemoteCopier {
-    fn computer(&self) -> &Computer {
+impl RemoteFileHandler for WindowsRemoteFileHandler {
+    fn remote_computer(&self) -> &Computer {
         &self.computer
     }
 
-    fn copier_impl(&self) -> &dyn Copier {
+    fn copier_impl(&self) -> &dyn FileHandler {
         self.copier_impl.as_ref()
     }
 
@@ -145,7 +146,7 @@ impl RemoteCopier for WindowsRemoteCopier {
     ) -> PathBuf {
         PathBuf::from(format!(
             "\\\\{}\\{}",
-            self.computer().address,
+            self.remote_computer().address,
             path.to_str().unwrap().replacen(":", "$", 1)
         ))
     }
