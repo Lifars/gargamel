@@ -54,11 +54,12 @@ pub fn run_piped_processes_blocking(
     }
     Ok(())
 }
+
 pub fn run_process_blocking_maybe_timed(
     command_name: &str,
     command_args: &[String],
     wait_for: Option<Duration>,
-) -> Result<()>{
+) -> Result<()> {
     match wait_for {
         None => run_process_blocking(command_name, command_args),
         Some(wait) => run_process_blocking_timed(command_name, command_args, wait),
@@ -97,13 +98,15 @@ pub fn create_report_path(
     store_directory: &Path,
     filename_prefix: &str,
     method_name: &str,
+    file_extension: &str,
 ) -> PathBuf {
     let address_formatted = remote_computer.address.replace(".", "-");
-    let filename = format!("{}-{}-{}-{}.txt",
+    let filename = format!("{}-{}-{}-{}.{}",
                            method_name,
                            filename_prefix,
                            address_formatted,
-                           remote_computer.username.replace(" ", "")
+                           remote_computer.username.replace(" ", ""),
+                           file_extension
     );
     let file_path = store_directory.join(filename);
     {

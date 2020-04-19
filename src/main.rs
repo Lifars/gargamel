@@ -21,6 +21,7 @@ use rpassword::read_password;
 use crate::registry_acquirer::RegistryAcquirer;
 use std::time::Duration;
 use crate::utils::remote_storage_file;
+use crate::events_acquirer::EventsAcquirer;
 
 mod process_runner;
 mod evidence_acquirer;
@@ -30,6 +31,8 @@ mod logo;
 mod memory_acquirer;
 mod command_utils;
 mod utils;
+mod large_evidence_acquirer;
+mod events_acquirer;
 mod file_acquirer;
 mod registry_acquirer;
 mod command_runner;
@@ -94,6 +97,18 @@ fn main() -> Result<(), io::Error> {
             acquirer.run_all();
         }
     }
+
+    if !opts.disable_event_download {
+        let event_acquirers = create_events_acquirers(
+            &remote_computer,
+            local_store_directory,
+            &opts,
+        );
+        for acquirer in event_acquirers {
+            acquirer.acquire();
+        }
+    }
+
     if let Some(custom_commands_path) = &opts.custom_command_path {
         let command_runners = create_command_runners(
             &remote_computer,
@@ -486,6 +501,84 @@ fn create_registry_acquirers<'a>(
     };
     acquirers
 }
+
+fn create_events_acquirers<'a>(
+    computer: &'a Computer,
+    local_store_directory: &'a Path,
+    opts: &Opts,
+) -> Vec<EventsAcquirer<'a>> {
+    let acquirers: Vec<EventsAcquirer<'a>> = if opts.all {
+        vec![
+            EventsAcquirer::psexec(
+                local_store_directory,
+                computer.clone(),
+                opts.no_compression
+            ),
+            EventsAcquirer::psremote(
+                local_store_directory,
+                computer.clone(),
+                opts.no_compression
+            ),
+            EventsAcquirer::wmi(
+                local_store_directory,
+                computer.clone(),
+                Duration::from_secs(opts.timeout),
+                opts.no_compression
+            ),
+            EventsAcquirer::rdp(
+                local_store_directory,
+                computer.clone(),
+                Duration::from_secs(opts.timeout),
+                opts.nla,
+                opts.no_compression
+            ),
+        ]
+    } else {
+        let mut acquirers = Vec::<EventsAcquirer<'a>>::new();
+        if opts.psexec {
+            acquirers.push(
+                EventsAcquirer::psexec(
+                    local_store_directory,
+                    computer.clone(),
+                    opts.no_compression
+                ),
+            );
+        }
+        if opts.psrem {
+            acquirers.push(
+                EventsAcquirer::psremote(
+                    local_store_directory,
+                    computer.clone(),
+                    opts.no_compression
+                ),
+            );
+        }
+        if opts.wmi {
+            acquirers.push(
+                EventsAcquirer::wmi(
+                    local_store_directory,
+                    computer.clone(),
+                    Duration::from_secs(opts.timeout),
+                    opts.no_compression
+                ),
+            );
+        }
+        if opts.rdp {
+            acquirers.push(
+                EventsAcquirer::rdp(
+                    local_store_directory,
+                    computer.clone(),
+                    Duration::from_secs(opts.timeout),
+                    opts.nla,
+                    opts.no_compression
+                ),
+            )
+        }
+        acquirers
+    };
+    acquirers
+}
+
 
 fn create_file_copiers(opts: &Opts, computer: &Computer) -> Vec<Box<dyn RemoteFileCopier>> {
     let copiers: Vec<Box<dyn RemoteFileCopier>> = if opts.all {

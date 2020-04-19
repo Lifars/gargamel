@@ -10,8 +10,6 @@ pub struct EvidenceAcquirer<'a> {
     logged_users_command: Option<Vec<String>>,
     running_processes_command: Option<Vec<String>>,
     active_network_connections_command: Option<Vec<String>>,
-    system_event_logs_command: Option<Vec<String>>,
-    application_event_logs_command: Option<Vec<String>>,
 }
 
 impl<'a> EvidenceAcquirer<'a> {
@@ -43,16 +41,6 @@ impl<'a> EvidenceAcquirer<'a> {
             active_network_connections_command: Some(vec![
                 "netstat".to_string(),
                 "-ano".to_string(),
-            ]),
-            system_event_logs_command: Some(vec![
-                "wevtutil".to_string(),
-                "qe".to_string(),
-                "system".to_string(),
-            ]),
-            application_event_logs_command: Some(vec![
-                "wevtutil".to_string(),
-                "qe".to_string(),
-                "application".to_string(),
             ]),
         }
     }
@@ -134,10 +122,6 @@ impl<'a> EvidenceAcquirer<'a> {
             ]),
             active_network_connections_command: Some(vec![
                 "netstat -natp".to_string(),
-            ]),
-            system_event_logs_command: None,
-            application_event_logs_command: Some(vec![
-                "lsof".to_string(),
             ]),
         }
     }
@@ -228,27 +212,6 @@ impl<'a> EvidenceAcquirer<'a> {
         }
     }
 
-    pub fn event_logs(&self) {
-        match &self.system_event_logs_command {
-            None => {},
-            Some(command) => {
-                self.run(
-                    command,
-                    "events-system",
-                )
-            },
-        };
-        match &self.application_event_logs_command {
-            None => {},
-            Some(command) => {
-                self.run(
-                    command,
-                    "events-application",
-                )
-            },
-        };
-    }
-
     pub fn run_all(
         &self,
     ) {
@@ -256,7 +219,6 @@ impl<'a> EvidenceAcquirer<'a> {
         self.network_state();
         self.active_network_connections();
         self.running_processes();
-        self.event_logs();
         self.logged_users();
     }
 }

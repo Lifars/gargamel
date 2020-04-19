@@ -56,15 +56,21 @@ pub struct Opts {
 
     #[clap(
     long = "no-evidence-search",
-    help = "Disables standard evidence search & registry acquire"
+    help = "Disables acquisition of evidence that can be usually downloaded quickly (like ipconfig, firewall status etc.)"
     )]
     pub disable_evidence_download: bool,
 
     #[clap(
     long = "no-registry-search",
-    help = "Disables standard evidence search & registry acquire"
+    help = "Disables registry acquisition"
     )]
     pub disable_registry_download: bool,
+
+    #[clap(
+    long = "no-events-search",
+    help = "Disables event acquisition"
+    )]
+    pub disable_event_download: bool,
 
     #[clap(short = "a", long = "all")]
     pub all: bool,

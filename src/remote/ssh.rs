@@ -39,6 +39,7 @@ impl Connector for Ssh {
                     store_directory,
                     &remote_connection.report_filename_prefix,
                     self.connect_method_name(),
+                    "txt"
                 );
                 {
                     File::create(&file_path)?;

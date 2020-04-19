@@ -5,6 +5,7 @@ use std::time::Duration;
 use std::io::{Error, Read};
 use std::fs::File;
 
+#[derive(Clone, Copy)]
 pub enum Compression {
     No,
     Yes,

@@ -40,6 +40,7 @@ impl Connector for Rdp {
                     store_directory,
                     &remote_connection.report_filename_prefix,
                     self.connect_method_name(),
+                    "txt"
                 );
                 Some(file_path.to_str().unwrap().to_string())
             }
