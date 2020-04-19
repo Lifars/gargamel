@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, FileHandler, RemoteFileHandler};
+use crate::remote::{Connector, Computer, Command, FileCopier, RemoteFileCopier};
 use std::io;
 use crate::process_runner::{create_report_path, run_piped_processes_blocking};
 use std::fs::File;
@@ -19,8 +19,8 @@ impl Connector for Ssh {
         &self.computer
     }
 
-    fn copier(&self) -> &dyn RemoteFileHandler {
-        self as &dyn RemoteFileHandler
+    fn copier(&self) -> &dyn RemoteFileCopier {
+        self as &dyn RemoteFileCopier
     }
 
     fn connect_and_run_command(&self,
@@ -107,7 +107,7 @@ impl Connector for Ssh {
     }
 }
 
-impl FileHandler for Ssh {
+impl FileCopier for Ssh {
     fn copy_file(
         &self,
         source: &Path,
@@ -175,13 +175,13 @@ impl FileHandler for Ssh {
     }
 }
 
-impl RemoteFileHandler for Ssh {
+impl RemoteFileCopier for Ssh {
     fn remote_computer(&self) -> &Computer {
         &self.computer
     }
 
-    fn copier_impl(&self) -> &dyn FileHandler {
-        self as &dyn FileHandler
+    fn copier_impl(&self) -> &dyn FileCopier {
+        self as &dyn FileCopier
     }
 
     fn path_to_remote_form(&self, path: &Path) -> PathBuf {

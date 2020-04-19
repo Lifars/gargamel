@@ -1,7 +1,8 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileHandler, Compression};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression};
 use std::path::Path;
 use std::{io, thread};
 use std::time::Duration;
+use crate::utils::{remote_storage, remote_storage_file};
 
 pub struct MemoryAcquirer<'a> {
     pub local_store_directory: &'a Path,
@@ -15,19 +16,21 @@ impl<'a> MemoryAcquirer<'a> {
     pub fn psexec(
         remote_computer: Computer,
         local_store_directory: &'a Path,
+        no_7zip: bool,
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
             connector: Box::new(PsExec::psexec(remote_computer)),
             image_timeout: None,
             compress_timeout: None,
-            compression: Compression::Yes,
+            compression: if no_7zip { Compression::No } else { Compression::Yes },
         }
     }
 
     pub fn psremote(
         remote_computer: Computer,
         local_store_directory: &'a Path,
+        _no_7zip: bool,
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
@@ -42,14 +45,15 @@ impl<'a> MemoryAcquirer<'a> {
         remote_computer: Computer,
         local_store_directory: &'a Path,
         timeout: Duration,
-        compress_timeout: Duration
+        compress_timeout: Duration,
+        no_7zip: bool,
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
-            connector: Box::new(Wmi { computer: remote_computer.clone(), }),
+            connector: Box::new(Wmi { computer: remote_computer.clone() }),
             image_timeout: Some(timeout),
             compress_timeout: Some(compress_timeout),
-            compression: Compression::YesSplit,
+            compression: if no_7zip { Compression::No } else { Compression::YesSplit },
         }
     }
 
@@ -58,7 +62,8 @@ impl<'a> MemoryAcquirer<'a> {
         local_store_directory: &'a Path,
         nla: bool,
         image_timeout: Duration,
-        compress_timeout: Duration
+        compress_timeout: Duration,
+        no_7zip: bool,
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
@@ -68,7 +73,7 @@ impl<'a> MemoryAcquirer<'a> {
             }),
             image_timeout: Some(image_timeout),
             compress_timeout: Some(compress_timeout),
-            compression: Compression::YesSplit,
+            compression: if no_7zip { Compression::No } else { Compression::YesSplit },
         }
     }
 
@@ -76,13 +81,12 @@ impl<'a> MemoryAcquirer<'a> {
         &self,
         target_name: &Path,
     ) -> io::Result<()> {
-        let local_store_directory = std::env::current_dir()
-            .expect("Cannot open current working directory")
-            .join(self.local_store_directory);
+        let local_store_directory = self.local_store_directory;
         let winpmem = "winpmem.exe";
 
+        // let target_name = remote_storage_file(target_name.file_name().unwrap());
         let target_name = match target_name.parent() {
-            None => Path::new("C:\\Users\\Public").join(target_name),
+            None => remote_storage_file(target_name.file_name().unwrap()),
             Some(_) => target_name.to_owned(),
         };
 
@@ -102,15 +106,15 @@ impl<'a> MemoryAcquirer<'a> {
         };
         self.connector.connect_and_run_local_program_in_current_directory(
             connection,
-            self.image_timeout
+            self.image_timeout,
         )?;
         let _copier = self.connector.copier();
         let _compression_split_copier = CompressCopier::new(self.connector.as_ref(), true, self.compress_timeout);
         let _compression_copier = CompressCopier::new(self.connector.as_ref(), false, self.compress_timeout);
         let copier = match self.compression {
             Compression::No => _copier,
-            Compression::Yes => &_compression_copier as &dyn RemoteFileHandler,
-            Compression::YesSplit => &_compression_split_copier as &dyn RemoteFileHandler,
+            Compression::Yes => &_compression_copier as &dyn RemoteFileCopier,
+            Compression::YesSplit => &_compression_split_copier as &dyn RemoteFileCopier,
         };
         match copier.copy_from_remote(
             &target_name,

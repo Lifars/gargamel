@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Command, Local, FileHandler, RemoteFileHandler, Computer};
+use crate::remote::{Connector, Command, Local, FileCopier, RemoteFileCopier, Computer, file_is_empty, path_to_part};
 use std::path::{Path, PathBuf};
 use std::{io, thread};
 use std::time::Duration;
@@ -35,7 +35,6 @@ impl<'a> Archiver<'a> {
         let path_string = path.to_string_lossy().to_string();
         let mut run_params = vec![
             "7za.exe".to_string(),
-//            "-ao".to_string()
         ];
 
         if split {
@@ -60,13 +59,13 @@ impl<'a> Archiver<'a> {
         if let Err(err) = self.connector.connect_and_run_local_program_in_current_directory(
             command,
             self.timeout.clone(),
-        ){
+        ) {
             debug!("{}", err)
         }
         if split {
             // already deleted by 7zip itself
         } else {
-            if let Err(err) = self.connector.copier().delete_remote_file(path){
+            if let Err(err) = self.connector.copier().delete_remote_file(path) {
                 debug!("{}", err)
             }
         }
@@ -111,23 +110,14 @@ impl<'a> CompressCopier<'a> {
             split,
         }
     }
-
-    pub fn path_to_part(path: &Path, part: usize) -> PathBuf {
-        let joined = match part {
-            part if part < 10 => format!("{}.00{}", path.display(), part),
-            part if part < 100 => format!("{}.0{}", path.display(), part),
-            part => format!("{}.{}", path.display(), part)
-        };
-        PathBuf::from(joined)
-    }
 }
 
-impl<'a> RemoteFileHandler for CompressCopier<'a> {
+impl<'a> RemoteFileCopier for CompressCopier<'a> {
     fn remote_computer(&self) -> &Computer {
         self.archiver.connector.computer()
     }
 
-    fn copier_impl(&self) -> &dyn FileHandler {
+    fn copier_impl(&self) -> &dyn FileCopier {
         self.archiver.connector.copier().copier_impl()
     }
 
@@ -150,55 +140,59 @@ impl<'a> RemoteFileHandler for CompressCopier<'a> {
         let wait_time_l = Duration::from_secs(10);
         if self.split {
             let mut i = 1;
-            let mut part = CompressCopier::path_to_part(archived_source, i);
+            let mut part = path_to_part(archived_source, i);
             while part.exists() {
-                if let Err(err) = remote_copier_impl.copy_to_remote(&part, target){
+                if let Err(err) = remote_copier_impl.copy_to_remote(&part, target) {
                     debug!("{}", err)
-                }
-                std::thread::sleep(wait_time_s.clone());
-                if let Err(err) = local.delete_file(&part) {
-                    debug!("{}", err);
+                } else {
+                    std::thread::sleep(wait_time_s.clone());
+                    if let Err(err) = local.delete_file(&part) {
+                        debug!("{}", err);
+                    }
                 }
                 i += 1;
-                part = CompressCopier::path_to_part(archived_source, i);
+                part = path_to_part(archived_source, i);
             }
-            std::thread::sleep(wait_time_s.clone());
+            std::thread::sleep(wait_time_l.clone());
             if let Err(err) = self.archiver.uncompress(
                 &target.join(
-                    CompressCopier::path_to_part(archived_source, 1).file_name().unwrap()
+                    path_to_part(archived_source, 1).file_name().unwrap()
                 )
             ) {
                 debug!("{}", err);
-            }
-
-            i -= 1;
-            let mut remote_part = target.join(
-                CompressCopier::path_to_part(archived_source, 1).file_name().unwrap());
-            while i > 0 {
-                if let Err(err) = remote_copier_impl.delete_remote_file(&remote_part) {
-                    debug!("{}", err);
-                }
-                std::thread::sleep(wait_time_l.clone());
+            } else {
                 i -= 1;
-                remote_part = target.join(CompressCopier::path_to_part(archived_source, 1).file_name().unwrap());
+                let mut remote_part = target.join(
+                    path_to_part(archived_source, 1).file_name().unwrap());
+
+                while i > 0 {
+                    if let Err(err) = remote_copier_impl.delete_remote_file(&remote_part) {
+                        debug!("{}", err);
+                    }
+                    std::thread::sleep(wait_time_l.clone());
+                    i -= 1;
+                    remote_part = target.join(path_to_part(archived_source, 1).file_name().unwrap());
+                }
             }
         } else {
             if let Err(err) = remote_copier_impl.copy_to_remote(&archived_source, target) {
                 debug!("{}", err);
+            } else {
+                if let Err(err) = local.delete_file(&archived_source) {
+                    debug!("{}", err)
+                }
             }
             std::thread::sleep(wait_time_l.clone());
             let target_archived = &target.join(
                 archived_source.file_name().unwrap()
             );
-            if let Err(err) = self.archiver.uncompress(&target_archived){
+            if let Err(err) = self.archiver.uncompress(&target_archived) {
                 debug!("{}", err)
-            }
-            std::thread::sleep(wait_time_l.clone());
-            if let Err(err) = local.delete_file(&archived_source){
-                debug!("{}", err)
-            }
-            if let Err(err) = remote_copier_impl.delete_remote_file(&target_archived) {
-                debug!("{}", err);
+            } else {
+                std::thread::sleep(wait_time_l.clone());
+                if let Err(err) = remote_copier_impl.delete_remote_file(&target_archived) {
+                    debug!("{}", err);
+                }
             }
         }
 
@@ -215,9 +209,9 @@ impl<'a> RemoteFileHandler for CompressCopier<'a> {
             debug!("{}", err);
         }
 
-        let wait_time_s = Duration::from_secs(1);
-        let wait_time_l = Duration::from_secs(10);
-        thread::sleep(wait_time_l.clone());
+        let wait_time_s = Duration::from_secs(10);
+        let wait_time_l = Duration::from_secs(30);
+        thread::sleep(wait_time_s.clone());
 
         let archive_name = format!("{}.7z", source.display());
         let archived_source = Path::new(&archive_name);
@@ -227,59 +221,73 @@ impl<'a> RemoteFileHandler for CompressCopier<'a> {
         let local_archiver = Archiver::local(&local);
 
         if self.split {
+            let mut unsuccessful_trials = 0;
             let mut i = 0;
             loop {
                 i += 1;
-                let part = CompressCopier::path_to_part(archived_source, i);
+                let part = path_to_part(archived_source, i);
                 trace!("Copying {} from {} using compression", part.display(), &self.archiver.connector.computer().address);
                 if let Err(err) = remote_copier_impl.copy_from_remote(&part, target) {
                     debug!("{}", err);
                 }
                 let target_downloaded = target.join(part.file_name().unwrap());
-                if !target_downloaded.exists() {
-                    break;
-                }
-                let mut file = File::open(target_downloaded)?;
-                let mut buf: [u8; 100] = [0; 100];
 
-                if file.read_exact(&mut buf).is_err() {
-                    break;
+                if file_is_empty(&target_downloaded) {
+                    unsuccessful_trials += 1;
+                    i -= 1;
+                    if unsuccessful_trials == 2 {
+                        break;
+                    }
+                    debug!("File download may ended with errors. Waiting {} seconds before retry.", wait_time_l.as_secs());
+                    thread::sleep(wait_time_l);
+                } else {
+                    unsuccessful_trials = 0;
                 }
+
                 thread::sleep(wait_time_s.clone());
-                if let Err(err) = remote_copier_impl.delete_remote_file(&part) {
-                    debug!("{}", err);
+
+                if unsuccessful_trials == 0 {
+                    if let Err(err) = remote_copier_impl.delete_remote_file(&part) {
+                        debug!("{}", err);
+                    }
                 }
             }
             let target_downloaded_without_part_suffix = target.join(archived_source.file_name().unwrap());
-            if let Err(err) = local_archiver.uncompress(&CompressCopier::path_to_part(&target_downloaded_without_part_suffix, 1)) {
+            if let Err(err) = local_archiver.uncompress(&path_to_part(&target_downloaded_without_part_suffix, 1)) {
                 debug!("{}", err);
-            }
-
-            let mut part = CompressCopier::path_to_part(&target_downloaded_without_part_suffix, i);
-            while i > 0 {
-                if let Err(err) = local.delete_file(&part) {
-                    debug!("{}", err);
+            } else {
+                let mut part = path_to_part(&target_downloaded_without_part_suffix, i);
+                while i > 0 {
+                    if let Err(err) = local.delete_file(&part) {
+                        debug!("{}", err);
+                    }
+                    i -= 1;
+                    part = path_to_part(&target_downloaded_without_part_suffix, i);
                 }
-                i -= 1;
-                part = CompressCopier::path_to_part(&target_downloaded_without_part_suffix, i);
             }
         } else {
             if let Err(err) = remote_copier_impl.copy_from_remote(archived_source, target) {
                 debug!("{}", err);
+            } else {
+                thread::sleep(wait_time_s.clone());
+                if let Err(err) = remote_copier_impl.delete_remote_file(archived_source) {
+                    debug!("{}", err);
+                }
             }
-            thread::sleep(wait_time_l.clone());
-            if let Err(err) = remote_copier_impl.delete_remote_file(archived_source) {
-                debug!("{}", err);
-            }
+
             let target_downloaded = target.join(archived_source.file_name().unwrap());
             if let Err(err) = local_archiver.uncompress(&target_downloaded) {
                 debug!("{}", err);
-            }
-            thread::sleep(wait_time_s.clone());
-            if let Err(err) = local.delete_file(&target_downloaded) {
-                debug!("{}", err);
+            } else {
+                thread::sleep(wait_time_s.clone());
+                if let Err(err) = local.delete_file(&target_downloaded) {
+                    debug!("{}", err);
+                }
             }
         }
         Ok(())
     }
 }
+
+
+

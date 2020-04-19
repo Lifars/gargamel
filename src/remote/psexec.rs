@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, RemoteFileHandler, Cmd, WindowsRemoteFileHandler};
+use crate::remote::{Connector, Computer, Command, RemoteFileCopier, Cmd, WindowsRemoteFileHandler};
 use std::time::Duration;
 use std::io::Error;
 
@@ -35,7 +35,7 @@ impl Connector for PsExec {
         &self.computer
     }
 
-    fn copier(&self) -> &dyn RemoteFileHandler {
+    fn copier(&self) -> &dyn RemoteFileCopier {
         &self.copier
     }
 

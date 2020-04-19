@@ -3,7 +3,7 @@ use crate::remote::Computer;
 use std::io;
 use crate::process_runner::run_process_blocking;
 
-pub trait FileHandler {
+pub trait FileCopier {
     fn copy_file(
         &self,
         source: &Path,
@@ -19,7 +19,7 @@ pub trait FileHandler {
 
 pub struct Cmd {}
 
-impl FileHandler for Cmd {
+impl FileCopier for Cmd {
     fn copy_file(
         &self,
         source: &Path,
@@ -55,9 +55,9 @@ impl FileHandler for Cmd {
     }
 }
 
-pub trait RemoteFileHandler {
+pub trait RemoteFileCopier {
     fn remote_computer(&self) -> &Computer;
-    fn copier_impl(&self) -> &dyn FileHandler;
+    fn copier_impl(&self) -> &dyn FileCopier;
 
     fn path_to_remote_form(
         &self,
@@ -83,12 +83,16 @@ pub trait RemoteFileHandler {
     ) -> io::Result<()> {
         self.copier_impl().copy_file(&self.path_to_remote_form(source), target)
     }
+
+    fn method_name(&self) -> &'static str {
+        self.copier_impl().method_name()
+    }
 }
 
 /// Use factory mathods to properly initialize the struct.
 pub struct WindowsRemoteFileHandler {
     computer: Computer,
-    copier_impl: Box<dyn FileHandler>,
+    copier_impl: Box<dyn FileCopier>,
 }
 
 impl Drop for WindowsRemoteFileHandler {
@@ -110,7 +114,7 @@ impl Drop for WindowsRemoteFileHandler {
 impl WindowsRemoteFileHandler {
     pub fn new(
         computer: Computer,
-        copier_impl: Box<dyn FileHandler>,
+        copier_impl: Box<dyn FileCopier>,
     ) -> WindowsRemoteFileHandler {
         let mut args = vec![
             "USE".to_string(),
@@ -131,12 +135,12 @@ impl WindowsRemoteFileHandler {
     }
 }
 
-impl RemoteFileHandler for WindowsRemoteFileHandler {
+impl RemoteFileCopier for WindowsRemoteFileHandler {
     fn remote_computer(&self) -> &Computer {
         &self.computer
     }
 
-    fn copier_impl(&self) -> &dyn FileHandler {
+    fn copier_impl(&self) -> &dyn FileCopier {
         self.copier_impl.as_ref()
     }
 

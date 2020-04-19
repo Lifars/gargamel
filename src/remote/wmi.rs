@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, FileHandler, RemoteFileHandler};
+use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier};
 use std::path::{Path, PathBuf};
 use std::io;
 use crate::process_runner::{run_process_blocking_maybe_timed, run_process_blocking_timed};
@@ -17,8 +17,8 @@ impl Connector for Wmi {
         &self.computer
     }
 
-    fn copier(&self) -> &dyn RemoteFileHandler {
-        self as &dyn RemoteFileHandler
+    fn copier(&self) -> &dyn RemoteFileCopier {
+        self as &dyn RemoteFileCopier
     }
 
     fn prepare_command(&self,
@@ -110,7 +110,7 @@ impl Wmi {
     }
 }
 
-impl FileHandler for Wmi {
+impl FileCopier for Wmi {
     fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
         self.copy_impl(source, target, "-Copy", true)
     }
@@ -147,13 +147,13 @@ impl FileHandler for Wmi {
     }
 }
 
-impl RemoteFileHandler for Wmi {
+impl RemoteFileCopier for Wmi {
     fn remote_computer(&self) -> &Computer {
         self.computer()
     }
 
-    fn copier_impl(&self) -> &dyn FileHandler {
-        self as &dyn FileHandler
+    fn copier_impl(&self) -> &dyn FileCopier {
+        self as &dyn FileCopier
     }
 
     fn path_to_remote_form(&self, path: &Path) -> PathBuf {

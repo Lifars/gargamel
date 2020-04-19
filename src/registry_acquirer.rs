@@ -1,8 +1,9 @@
 use std::path::Path;
-use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileHandler, Compression};
+use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression};
 use crate::process_runner::create_report_path;
 use std::thread;
 use std::time::Duration;
+use crate::utils::remote_storage;
 
 pub struct RegistryAcquirer<'a> {
     store_directory: &'a Path,
@@ -61,37 +62,40 @@ impl<'a> RegistryAcquirer<'a> {
     pub fn psexec(
         store_directory: &'a Path,
         computer: Computer,
-    ) -> RegistryAcquirer{
+        no_7zip: bool,
+    ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
             Box::new(PsExec::psexec(computer)),
             None,
-            Compression::Yes
+            if no_7zip { Compression::No } else { Compression::Yes },
         )
     }
 
     pub fn psremote(
         store_directory: &'a Path,
         computer: Computer,
-    ) -> RegistryAcquirer{
+        _no_7zip: bool,
+    ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
             Box::new(PsRemote::new(computer)),
             None,
-            Compression::No
+            Compression::No,
         )
     }
 
     pub fn wmi(
         store_directory: &'a Path,
         computer: Computer,
-        compress_timeout: Duration
-    ) -> RegistryAcquirer{
+        compress_timeout: Duration,
+        no_7zip: bool,
+    ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(Wmi{ computer }),
+            Box::new(Wmi { computer }),
             Some(compress_timeout),
-            Compression::YesSplit
+            if no_7zip { Compression::No } else { Compression::YesSplit }
         )
     }
 
@@ -99,13 +103,14 @@ impl<'a> RegistryAcquirer<'a> {
         store_directory: &'a Path,
         computer: Computer,
         compress_timeout: Duration,
-        nla: bool
-    ) -> RegistryAcquirer{
+        nla: bool,
+        no_7zip: bool,
+    ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(Rdp{ computer, nla }),
+            Box::new(Rdp { computer, nla }),
             Some(compress_timeout),
-            Compression::YesSplit
+            if no_7zip { Compression::No } else { Compression::YesSplit }
         )
     }
 
@@ -124,7 +129,10 @@ impl<'a> RegistryAcquirer<'a> {
             self.connector.connect_method_name(),
         );
 
-        let remote_report_path = format!("C:\\Users\\Public\\{}", report_path.file_name().unwrap().to_string_lossy());
+        let remote_report_path = remote_storage()
+            .join(report_path.file_name().unwrap())
+            .to_string_lossy()
+            .to_string();
         let mut command = command.to_vec();
         command.push(remote_report_path.clone());
         command.push("/y".to_string());
@@ -156,8 +164,8 @@ impl<'a> RegistryAcquirer<'a> {
         let _compression_copier = CompressCopier::new(self.connector.as_ref(), false, self.compress_timeout.clone());
         let copier = match self.compression {
             Compression::No => self.connector.copier(),
-            Compression::Yes => &_compression_copier as &dyn RemoteFileHandler,
-            Compression::YesSplit => &_compression_split_copier as &dyn RemoteFileHandler,
+            Compression::Yes => &_compression_copier as &dyn RemoteFileCopier,
+            Compression::YesSplit => &_compression_split_copier as &dyn RemoteFileCopier,
         };
 
         match copier.copy_from_remote(Path::new(&remote_report_path), report_path.parent().unwrap()) {
@@ -185,15 +193,15 @@ impl<'a> RegistryAcquirer<'a> {
     }
 
     pub fn acquire(&self) {
-        let command = &self.registry_hku_command;
-        self.run(
-            command,
-            "registry-hku",
-        );
         let command = &self.registry_hklm_command;
         self.run(
             command,
             "registry-hklm",
+        );
+        let command = &self.registry_hku_command;
+        self.run(
+            command,
+            "registry-hku",
         );
         let command = &self.registry_hkcu_command;
         self.run(

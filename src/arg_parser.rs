@@ -60,6 +60,11 @@ pub struct Opts {
     )]
     pub disable_evidence_download: bool,
 
+    #[clap(
+    long = "no-registry-search",
+    help = "Disables standard evidence search & registry acquire"
+    )]
+    pub disable_registry_download: bool,
 
     #[clap(short = "a", long = "all")]
     pub all: bool,
@@ -108,5 +113,17 @@ pub struct Opts {
 
     #[clap(long = "nla", help = "Optional: Use network level authentication for RDP")]
     pub nla: bool,
+
+    #[clap(long = "no-7z", help = "Optional: Disable 7zip compression for registry & memory images.")]
+    pub no_compression: bool,
+
+    #[clap(long = "redownload", help =
+    "Optional: Download and DELETE specified file from target computer. \
+    Use in case of previous failed partially completed operation. \
+    For just downloading a file please use a `search` switch.
+    If you specify a 7zip chunk (.7z.[chunk-number]), then it will also automatically try to download \
+    subsequent chunks.\
+    Use with --psexec --psrem, --rdp, --wmi, --all options")]
+    pub re_download: Option<String>
 }
 

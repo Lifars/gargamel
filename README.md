@@ -17,8 +17,7 @@ Debug build can be compiled using
 cargo build
 ```
 
-Make sure to have the following programs in *Path* or in the same directory as Gargamel.
-* `wmic`, should be by default on Windows
+Make sure to have the following programs in the same directory as Gargamel.
 * `psexec`, [download](https://docs.microsoft.com/en-us/sysinternals/downloads/psexec)
 * `paexec`, an open source alternative to PsExec, [download](https://www.poweradmin.com/paexec/)
 * `winpmem`, an open source memory image tool, [download](https://github.com/Velocidex/c-aff4/releases).

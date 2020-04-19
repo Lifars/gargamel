@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, FileHandler, Command, RemoteFileHandler};
+use crate::remote::{Connector, Computer, FileCopier, Command, RemoteFileCopier};
 use std::path::{Path, PathBuf};
 use std::io;
 use crate::process_runner::{run_process_blocking, create_report_path};
@@ -19,8 +19,8 @@ impl Connector for Rdp {
         &self.computer
     }
 
-    fn copier(&self) -> &dyn RemoteFileHandler {
-        self as &dyn RemoteFileHandler
+    fn copier(&self) -> &dyn RemoteFileCopier {
+        self as &dyn RemoteFileCopier
     }
 
     fn connect_and_run_command(
@@ -148,7 +148,7 @@ impl Rdp {
     }
 }
 
-impl FileHandler for Rdp {
+impl FileCopier for Rdp {
     fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
         self.run_command(format!(
             "command=xcopy {} {} /y",
@@ -169,13 +169,13 @@ impl FileHandler for Rdp {
     }
 }
 
-impl RemoteFileHandler for Rdp {
+impl RemoteFileCopier for Rdp {
     fn remote_computer(&self) -> &Computer {
         &self.computer
     }
 
-    fn copier_impl(&self) -> &dyn FileHandler {
-        self as &dyn FileHandler
+    fn copier_impl(&self) -> &dyn FileCopier {
+        self as &dyn FileCopier
     }
 
     fn path_to_remote_form(&self, path: &Path) -> PathBuf {
@@ -208,3 +208,4 @@ impl RemoteFileHandler for Rdp {
         self.copier_impl().copy_file(source, &self.path_to_remote_form(target))
     }
 }
+

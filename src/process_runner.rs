@@ -13,7 +13,7 @@ pub fn run_process_blocking(
     command_name: &str,
     command_args: &[String],
 ) -> Result<()> {
-    debug!("Starting process {}, with args: {:?}", command_name, command_args);
+    trace!("Starting process {}, with args: {:?}", command_name, command_args);
     let mut command = Command::new(command_name);
     // command.stdout(Stdio::null());
     if command_args.is_empty().not() {
@@ -35,7 +35,7 @@ pub fn run_piped_processes_blocking(
     if !command_args_first.is_empty() {
         first.args(command_args_first);
     }
-    debug!("Starting process \"{}\" with params {:?}", command_name_first, command_args_first);
+    trace!("Starting process \"{}\" with params {:?}", command_name_first, command_args_first);
     let mut first = first.stdout(Stdio::piped())
         .spawn()?;
 
@@ -45,7 +45,7 @@ pub fn run_piped_processes_blocking(
         if !command_args_second.is_empty() {
             second.args(command_args_second);
         }
-        debug!("Starting process {} with params {:?}", command_name_second, command_args_second);
+        trace!("Starting process {} with params {:?}", command_name_second, command_args_second);
         let output = second.output()?;
         trace!("Command {} output: {}", command_name_second, String::from_utf8_lossy(&output.stdout));
         trace!("Command {} error: {}", command_name_second, String::from_utf8_lossy(&output.stderr));
@@ -70,7 +70,7 @@ pub fn run_process_blocking_timed(
     command_args: &[String],
     wait_for: Duration,
 ) -> Result<()> {
-    debug!("Starting process {}, with args: {:?} and timeout of {} seconds", command_name, command_args, wait_for.as_secs());
+    trace!("Starting process {}, with args: {:?} and timeout of {} seconds", command_name, command_args, wait_for.as_secs());
     let mut command = Command::new(command_name);
     if command_args.is_empty().not() {
         command.args(command_args);

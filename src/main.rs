@@ -13,13 +13,14 @@ extern crate simplelog;
 use clap::derive::Clap;
 use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Cmd, Powershell, WindowsRemoteFileHandler, Rdp, Wmi, Ssh, RemoteFileHandler};
+use crate::remote::{Computer, Cmd, Powershell, WindowsRemoteFileHandler, Rdp, Wmi, Ssh, RemoteFileCopier, ReDownloader};
 use crate::memory_acquirer::MemoryAcquirer;
 use crate::command_runner::CommandRunner;
 use crate::file_acquirer::download_files;
 use rpassword::read_password;
 use crate::registry_acquirer::RegistryAcquirer;
 use std::time::Duration;
+use crate::utils::remote_storage_file;
 
 mod process_runner;
 mod evidence_acquirer;
@@ -36,7 +37,7 @@ mod command_runner;
 fn setup_logger() {
     CombinedLogger::init(
         vec![
-            TermLogger::new(LevelFilter::Info, Config::default(), TerminalMode::Mixed).unwrap(),
+            TermLogger::new(LevelFilter::Trace, Config::default(), TerminalMode::Mixed).unwrap(),
             WriteLogger::new(LevelFilter::Trace, Config::default(), File::create("gargamel.log").unwrap()),
         ]
     ).unwrap();
@@ -60,8 +61,28 @@ fn main() -> Result<(), io::Error> {
 
     let remote_computer = Computer::from(opts.clone());
 
-    let local_store_directory = Path::new(&opts.store_directory);
+
+    // let local_store_directory_owned = match Path::new(&opts.store_directory).can {
+    //     None => std::env::current_dir().unwrap().join(&opts.s),
+    //     Some(_) => {},
+    // };
+    let local_store_directory_owned = dunce::canonicalize(Path::new(&opts.store_directory)).unwrap();
+    let local_store_directory = local_store_directory_owned.as_path();
     let key_file = opts.ssh_key.clone().map(|it| PathBuf::from(it));
+
+    if let Some(remote_file) = &opts.re_download {
+        let copiers = create_file_copiers(&opts, &remote_computer);
+        let remote_file = Path::new(&remote_file);
+        for copier in copiers {
+            info!("Trying to download {} from {} using method {}", remote_file.display(), remote_computer.address, copier.method_name());
+            let re_downloader = ReDownloader{
+                copier: copier.as_ref(),
+                target_dir: local_store_directory
+            };
+            re_downloader.retry_download(remote_file);
+        }
+    }
+
     if !opts.disable_evidence_download {
         let evidence_acquirers = create_evidence_acquirers(
             &remote_computer,
@@ -72,16 +93,8 @@ fn main() -> Result<(), io::Error> {
         for acquirer in evidence_acquirers {
             acquirer.run_all();
         }
-        let registry_acquirers = create_registry_acquirers(
-            &remote_computer,
-            local_store_directory,
-            &opts,
-        );
-        for acquirer in registry_acquirers {
-            acquirer.acquire();
-        }
     }
-    if opts.custom_command_path.is_some() {
+    if let Some(custom_commands_path) = &opts.custom_command_path {
         let command_runners = create_command_runners(
             &remote_computer,
             local_store_directory,
@@ -91,13 +104,22 @@ fn main() -> Result<(), io::Error> {
         for command_runner in command_runners {
             info!("Running commands using method {}", command_runner.connector.connect_method_name());
             command_runner.run_commands(
-                Path::new(opts.custom_command_path.as_ref().unwrap()),
+                Path::new(custom_commands_path),
                 Some(Duration::from_secs(opts.timeout)),
             );
         }
     }
-    if opts.search_files_path.is_some() {
-        let search_files_path = opts.search_files_path.as_ref().unwrap();
+    if !opts.disable_registry_download {
+        let registry_acquirers = create_registry_acquirers(
+            &remote_computer,
+            local_store_directory,
+            &opts,
+        );
+        for acquirer in registry_acquirers {
+            acquirer.acquire();
+        }
+    }
+    if let Some(search_files_path) = &opts.search_files_path {
         let search_files_path = Path::new(search_files_path);
         if opts.ssh {
             let remote_copier = Ssh {
@@ -125,16 +147,15 @@ fn main() -> Result<(), io::Error> {
             }
         }
     }
-    if opts.image_memory.is_some() {
+    if let Some(image_memory) = &opts.image_memory {
         let memory_acquirers = create_memory_acquirers(
             &remote_computer,
             local_store_directory,
             &opts,
         );
-        let image_memory_remote_store = opts.image_memory.as_ref().unwrap();
         for acquirer in memory_acquirers {
             info!("Running memory acquirer using method {}", acquirer.connector.connect_method_name());
-            let image_res = acquirer.image_memory(Path::new(image_memory_remote_store.as_str()));
+            let image_res = acquirer.image_memory(Path::new(image_memory.as_str()));
             if image_res.is_ok() {
                 break;
             }
@@ -236,10 +257,12 @@ fn create_memory_acquirers<'a>(
             MemoryAcquirer::psexec(
                 computer.clone(),
                 local_store_directory,
+                opts.no_compression
             ),
             MemoryAcquirer::psremote(
                 computer.clone(),
                 local_store_directory,
+                opts.no_compression
             ),
             MemoryAcquirer::rdp(
                 computer.clone(),
@@ -247,12 +270,14 @@ fn create_memory_acquirers<'a>(
                 opts.nla,
                 Duration::from_secs(opts.timeout),
                 Duration::from_secs(opts.compress_timeout),
+                opts.no_compression
             ),
             MemoryAcquirer::wmi(
                 computer.clone(),
                 local_store_directory,
                 Duration::from_secs(opts.timeout),
-                Duration::from_secs(opts.compress_timeout)
+                Duration::from_secs(opts.compress_timeout),
+                opts.no_compression
             ),
         ]
     } else {
@@ -262,6 +287,7 @@ fn create_memory_acquirers<'a>(
                 MemoryAcquirer::psexec(
                     computer.clone(),
                     local_store_directory,
+                    opts.no_compression
                 )
             );
         }
@@ -270,6 +296,7 @@ fn create_memory_acquirers<'a>(
                 MemoryAcquirer::psremote(
                     computer.clone(),
                     local_store_directory,
+                    opts.no_compression
                 )
             );
         }
@@ -281,6 +308,7 @@ fn create_memory_acquirers<'a>(
                     opts.nla,
                     Duration::from_secs(opts.timeout),
                     Duration::from_secs(opts.compress_timeout),
+                    opts.no_compression
                 )
             );
         }
@@ -290,7 +318,8 @@ fn create_memory_acquirers<'a>(
                     computer.clone(),
                     local_store_directory,
                     Duration::from_secs(opts.timeout),
-                    Duration::from_secs(opts.compress_timeout)
+                    Duration::from_secs(opts.compress_timeout),
+                    opts.no_compression
                 )
             );
         }
@@ -390,22 +419,26 @@ fn create_registry_acquirers<'a>(
         vec![
             RegistryAcquirer::psexec(
                 local_store_directory,
-                computer.clone()
+                computer.clone(),
+                opts.no_compression
             ),
             RegistryAcquirer::psremote(
                 local_store_directory,
-                computer.clone()
+                computer.clone(),
+                opts.no_compression
             ),
             RegistryAcquirer::wmi(
                 local_store_directory,
                 computer.clone(),
-                Duration::from_secs(opts.timeout)
+                Duration::from_secs(opts.timeout),
+                opts.no_compression
             ),
             RegistryAcquirer::rdp(
                 local_store_directory,
                 computer.clone(),
                 Duration::from_secs(opts.timeout),
-                opts.nla
+                opts.nla,
+                opts.no_compression
             ),
         ]
     } else {
@@ -414,7 +447,8 @@ fn create_registry_acquirers<'a>(
             acquirers.push(
                 RegistryAcquirer::psexec(
                     local_store_directory,
-                    computer.clone()
+                    computer.clone(),
+                    opts.no_compression
                 ),
             );
         }
@@ -422,7 +456,8 @@ fn create_registry_acquirers<'a>(
             acquirers.push(
                 RegistryAcquirer::psremote(
                     local_store_directory,
-                    computer.clone()
+                    computer.clone(),
+                    opts.no_compression
                 ),
             );
         }
@@ -431,7 +466,8 @@ fn create_registry_acquirers<'a>(
                 RegistryAcquirer::wmi(
                     local_store_directory,
                     computer.clone(),
-                    Duration::from_secs(opts.timeout)
+                    Duration::from_secs(opts.timeout),
+                    opts.no_compression
                 ),
             );
         }
@@ -441,7 +477,8 @@ fn create_registry_acquirers<'a>(
                     local_store_directory,
                     computer.clone(),
                     Duration::from_secs(opts.timeout),
-                    opts.nla
+                    opts.nla,
+                    opts.no_compression
                 ),
             )
         }
@@ -450,8 +487,8 @@ fn create_registry_acquirers<'a>(
     acquirers
 }
 
-fn create_file_copiers(opts: &Opts, computer: &Computer) -> Vec<Box<dyn RemoteFileHandler>> {
-    let copiers: Vec<Box<dyn RemoteFileHandler>> = if opts.all {
+fn create_file_copiers(opts: &Opts, computer: &Computer) -> Vec<Box<dyn RemoteFileCopier>> {
+    let copiers: Vec<Box<dyn RemoteFileCopier>> = if opts.all {
         vec![
             Box::new(WindowsRemoteFileHandler::new(
                 computer.clone(),
@@ -470,7 +507,7 @@ fn create_file_copiers(opts: &Opts, computer: &Computer) -> Vec<Box<dyn RemoteFi
             }),
         ]
     } else {
-        let mut copiers = Vec::<Box<dyn RemoteFileHandler>>::new();
+        let mut copiers = Vec::<Box<dyn RemoteFileCopier>>::new();
         if opts.psexec {
             copiers.push(
                 Box::new(WindowsRemoteFileHandler::new(

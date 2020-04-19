@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, FileHandler, RemoteFileHandler, WindowsRemoteFileHandler};
+use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, WindowsRemoteFileHandler};
 use std::path::Path;
 use std::io;
 use crate::process_runner::run_process_blocking;
@@ -25,7 +25,7 @@ impl Connector for PsRemote {
         &self.computer
     }
 
-    fn copier(&self) -> &dyn RemoteFileHandler {
+    fn copier(&self) -> &dyn RemoteFileCopier {
         &self.copier
     }
 
@@ -79,7 +79,7 @@ impl Connector for PsRemote {
 
 pub struct Powershell {}
 
-impl FileHandler for Powershell {
+impl FileCopier for Powershell {
     fn copy_file(
         &self,
         source: &Path,

@@ -4,7 +4,8 @@ use std::{iter, thread};
 use std::path::Path;
 use crate::arg_parser::Opts;
 use std::time::Duration;
-use crate::remote::RemoteFileHandler;
+use crate::remote::RemoteFileCopier;
+use crate::utils::remote_storage;
 
 #[derive(Clone)]
 pub struct Computer {
@@ -64,13 +65,21 @@ pub trait Connector {
 
     fn computer(&self) -> &Computer;
 
-    fn copier(&self) -> &dyn RemoteFileHandler;
+    fn copier(&self) -> &dyn RemoteFileCopier;
 
     fn connect_and_run_local_program_in_current_directory(
         &self,
         command_to_run: Command<'_>,
         timeout: Option<Duration>
     ) -> Result<()> {
+        let mut command = command_to_run.command;
+        command[0] = std::env::current_dir().unwrap()
+            .join(Path::new(&command[0]).file_name().unwrap())
+            .to_string_lossy().to_string();
+        let command_to_run = Command {
+            command,
+            ..command_to_run
+        };
         self.connect_and_run_local_program(
             command_to_run,
             timeout
@@ -83,9 +92,9 @@ pub trait Connector {
         timeout: Option<Duration>
     ) -> Result<()> {
         let local_program_path = Path::new(command_to_run.command.first().unwrap());
-        let remote_storage = Path::new("C:\\Users\\Public");
+        let remote_storage = remote_storage();
         let copier = self.copier();
-        copier.copy_to_remote(&local_program_path, remote_storage)?;
+        copier.copy_to_remote(&local_program_path, &remote_storage)?;
         thread::sleep(Duration::from_millis(20_000));
         let remote_program_path = remote_storage.join(local_program_path
             .file_name()

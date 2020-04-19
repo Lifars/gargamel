@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, FileHandler, RemoteFileHandler, Command};
+use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, Command};
 use std::path::{Path, PathBuf};
 use std::{io, fs};
 use std::time::Duration;
@@ -31,8 +31,8 @@ impl Connector for Local {
         &self.localhost
     }
 
-    fn copier(&self) -> &dyn RemoteFileHandler {
-        self as &dyn RemoteFileHandler
+    fn copier(&self) -> &dyn RemoteFileCopier {
+        self as &dyn RemoteFileCopier
     }
 
     fn prepare_command(&self,
@@ -52,7 +52,7 @@ impl Connector for Local {
     }
 }
 
-impl FileHandler for Local {
+impl FileCopier for Local {
     fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
         if source.is_file() {
             let target = if target.is_file() {
@@ -86,12 +86,12 @@ impl FileHandler for Local {
     }
 }
 
-impl RemoteFileHandler for Local {
+impl RemoteFileCopier for Local {
     fn remote_computer(&self) -> &Computer {
         &self.localhost
     }
 
-    fn copier_impl(&self) -> &dyn FileHandler {
+    fn copier_impl(&self) -> &dyn FileCopier {
         self
     }
 
