@@ -44,7 +44,6 @@ pub struct Opts {
     #[clap(
     short = "r",
     long = "remote-storage",
-    default_value = "evidence-output",
     help = "Name of remote directory to be used as a temporary storage. (Windows targets only)",
     default_value = "C:\\Users\\Public"
     )]
@@ -122,9 +121,9 @@ pub struct Opts {
     )]
     pub ssh: bool,
 
-    #[clap(long = "local",
-    help = "Acquire evidence from local machine.")]
-    pub local: bool,
+    // #[clap(long = "local",
+    // help = "Acquire evidence from local machine.")]
+    // pub local: bool,
 
     #[clap(
     short = "m",
@@ -156,9 +155,9 @@ pub struct Opts {
     #[clap(long = "redownload", help =
     "Optional: Download and DELETE specified file from target computer. \
     Use this in case of previous failed partially completed operation. \
-    For just downloading a file (without deleting it) please use a `search` switch.
-    If you specify a 7zip chunk (.7z.[chunk-number], e.g. .7z.004), then it will also automatically try to download \
-    subsequent chunks.\
+    For just downloading a file (without deleting it) please use a `search` switch. \
+    If you specify a 7zip chunk (.7z.[chunk-number], e.g. .7z.004), then it will also automatically \
+    try to download subsequent chunks. \
     Use also with --psexec --psrem, --rdp, --wmi, --all")]
     pub re_download: Option<String>
 }

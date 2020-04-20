@@ -1,3 +1,0 @@
-# Files to download
-# Examples:
-/home/vildibald/out*

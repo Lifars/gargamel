@@ -23,8 +23,8 @@ If you wish to change the logging level:
 * On lines 42 and 43 change `LevelFilter::Info` to (for example) `LevelFilter::Trace` for more detailed logging.
     * Beware that the `LevelFilter::Trace` will log everything including passwords.  
 
-Run
----
+User guide
+----------
 
 Right now, this app works only on Windows and the target computer must use also Windows.
 
@@ -40,8 +40,141 @@ Make sure to have the following programs in the same directory as Gargamel.
 * `WMImplant`, as open source PowerShell WMI command executor, [download](https://github.com/vildibald/WMImplant)
 * `7za.exe`, a standalone console version of 7zip archiver, [download](https://www.7-zip.org/download.html)   
 
+### Unleashing the power of Gargamel
 
-Help:
+Gargamel needs to be launched from an elevated terminal to be fully functional.
+Currently it does not support the UAC dialog nor any kind of notification when running with limited privileges.
+When running with limited user privileges, then some operations like target memory dumping will not work.
+
+#### Basic example
+
+Assume you want to connect to computer with the following parameters:
+* address `192.168.42.47`
+* username `Jano`
+* password `nbusr123`
+
+The following command will acquire firewall state, network state, logged users, running processes, 
+active network connections, registry, system & application event logs using PsExec method.
+Evidence will be stored in a `testResults` directory relative to the location of Gargamel.
+
+```bash
+gargamel.exe -c 192.168.42.47 -u Jano --psexec -o testResults
+```
+
+Gargamel will ask you for password of the remote user, in our example `nbusr123`.
+Note that password will be hidden when typing.
+
+
+It is also possible to specify the password right as program argument.   
+
+```bash
+gargamel.exe -c 192.168.42.47 -u Jano --psexec -p nbusr123 -o testResults
+```
+
+#### Domain example
+
+Assume you want to connect to computer in domain with the following parameters:
+* domain `WORKSPACE`
+* computer name `JanovPC`
+* username `Jano`
+* password `nbusr123`
+
+The following command will acquire firewall state, network state, logged users, running processes, 
+active network connections, registry, system & application event logs using PsExec method.
+
+```bash
+gargamel.exe -c JanovPC -u Jano -d WORKSPACE --psexec -o testResults
+```
+
+Or to skip password prompting specify the password directly.
+
+```bash
+gargamel.exe -c JanovPC -u Jano -d WORKSPACE --psexec -p nbusr123 -o testResults
+```
+
+#### Other connection methods
+
+PsExec is one of 5 supported connection methods.
+You can replace the `--psexec` with the following options:
+* `--psexec`
+* `--psrem`, if PowerShell remoting is configured on target machine.
+* `--rdp`, if RDP is enabled on target machine.
+* `--wmi`.
+* `--ssh`, if target machine uses Linux.
+
+It is possible to use several methods at once. 
+For example to use both PsExec and RDP one can use the following command.
+
+```bash
+gargamel.exe -c 192.168.42.47 -u Jano --psexec --rdp -o testResults
+```
+
+There is also a special switch `--all` that is equal to specifying `--psexec --rdp --psrem --wmi`.
+
+###### Note: Launch parameters are order-agnostic, i.e. it does not matter in which order the parameters are specified.
+
+#### Acquire memory
+
+To acquire also memory dump, then simply add the `-m` flag to the program parameters, i.e.
+
+```bash
+gargamel.exe -c 192.168.42.47 -u Jano --psexec -o testResults -m
+```
+
+If you wish to acquire ONLY the memory dump without other evidence then use the following command.
+ 
+```bash
+gargamel.exe -c 192.168.42.47 -u Jano --psexec -o testResults -m --no-events-search --no-evidence-search --no-registry-search                                                          
+```
+
+#### Run custom commands
+
+You may run custom Windows CMD or Linux shell commands on remote machine using Gargamel.
+
+First create a file `custom-commands.txt` with the following content.
+
+```bash
+# Will be run using any method
+ipconfig
+# Will run only when launching with at least one of --all, --psexec, --wmi methods
+:psexec:wmi ipconfig -all
+```  
+
+Results of the above commands will be stored in the directory specified by `-o` option.
+
+To run the above commands written in `custom-commands.txt` use the `-e` switch, i.e. 
+
+```bash
+gargamel.exe -c 192.168.42.47 -u Jano --psexec -o testResults -e custom-commands.txt                                                           
+```
+
+#### Download custom files
+
+Gargamel is able to download remote files.
+
+First create a file `custom-files.txt` with the following content.
+
+```bash
+C:\Users\Public\sss*
+C:\Users\Jano\danove.pdf 
+# This and next line will be ignored
+# C:\Users\Jano\somBajecny.pptx  
+```  
+
+###### Note: Wildcards * and ? are supported but currently only in filenames, not parent directories, i.e. C:\Users\J*\danove.pdf will most likely not work.
+
+Results of the above commands will be stored in the directory specified by `-o` option.
+
+To run the above commands written in `custom-files.txt` use the `-s` switch, i.e. 
+
+```bash
+gargamel.exe -c 192.168.42.47 -u Jano --psexec -o testResults -s custom-files.txt                                                           
+```
+
+#### All options
+
+All supported switches are described below.
+
 ```bash
 USAGE:
     gargamel.exe [FLAGS] [OPTIONS] --user <user>
@@ -75,7 +208,7 @@ FLAGS:
 
 OPTIONS:
     -c, --computer <computer>                        Remote computer address/name. [default: 127.0.0.1]
-    -e, --commands <custom-command-path>             Optional: File with custom commands to execute on remote computer
+    -u, --user <user>                                Remote user name
     -d, --domain <domain>                            Optional: Remote Windows domain
     -o, --output <local-store-directory>
             Name of local directory to store the evidence [default: evidence-output]
@@ -83,26 +216,31 @@ OPTIONS:
     -p, --password <password>
             Optional: Remote user password. Skipping this option will prompt a possibility to put a password in hidden
             way.To specify an empty password use `-p ""`
+
         --redownload <re-download>
             Optional: Download and DELETE specified file from target computer. Use this in case of previous failed
             partially completed operation. For just downloading a file (without deleting it) please use a `search`
-            switch.
-                If you specify a 7zip chunk (.7z.[chunk-number], e.g. .7z.004), then it will also automatically try to
+            switch. If you specify a 7zip chunk (.7z.[chunk-number], e.g. .7z.004), then it will also automatically try to
             download subsequent chunks.Use also with --psexec --psrem, --rdp, --wmi, --all
+
     -r, --remote-storage <remote-store-directory>
             Name of remote directory to be used as a temporary storage. (Windows targets only) [default:
             C:\Users\Public]
+
+    -e, --commands <custom-command-path>             Optional: File with custom commands to execute on remote computer
+
     -s, --search <search-files-path>
             Optional: File with files names to be searched on remote computer. File names supports also `*` and `?`
             wildcards on file names (but not yet parent directories).
+
         --key <ssh-key>                              Optional: Name/path of SSH private key file. (Linux target only)
+
         --timeout <timeout>
             Optional: Timeout in seconds for long running operations.This option is a workaround for a bug in
             WMImplant.ps1 amd SharpRDP.exe where finishing of a long running operation cannot sometimes properly close
             the connection leaving the Gargamel in seemingly frozen state or executing the next operation with the
             previous one unfinished on target site.Increasing this timeout may solve issues when acquiring registry or
             memory image from target machine. [default: 300]
-    -u, --user <user>                                Remote user name
 
 ```
 

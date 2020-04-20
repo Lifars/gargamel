@@ -248,13 +248,13 @@ fn create_evidence_acquirers<'a>(
                 )
             );
         }
-        if opts.local {
-            acquirers.push(
-                EvidenceAcquirer::local(
-                    local_store_directory,
-                )
-            )
-        }
+        // if opts.local {
+        //     acquirers.push(
+        //         EvidenceAcquirer::local(
+        //             local_store_directory,
+        //         )
+        //     )
+        // }
         if opts.ssh {
             acquirers.push(
                 EvidenceAcquirer::ssh(
@@ -420,13 +420,13 @@ fn create_command_runners<'a>(
                 )
             );
         }
-        if opts.local {
-            acquirers.push(
-                CommandRunner::local(
-                    local_store_directory,
-                )
-            )
-        }
+        // if opts.local {
+        //     acquirers.push(
+        //         CommandRunner::local(
+        //             local_store_directory,
+        //         )
+        //     )
+        // }
         if opts.ssh {
             acquirers.push(
                 CommandRunner::ssh(
