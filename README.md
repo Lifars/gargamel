@@ -16,16 +16,6 @@ Debug build can be compiled using
 ```bash
 cargo build
 ```
-
-Make sure to have the following programs in the same directory as Gargamel.
-* `psexec`, [download](https://docs.microsoft.com/en-us/sysinternals/downloads/psexec)
-* `paexec`, an open source alternative to PsExec, [download](https://www.poweradmin.com/paexec/)
-* `winpmem`, an open source memory image tool, [download](https://github.com/Velocidex/c-aff4/releases).
-     * Download the newest executable and rename it to *winpmem.exe*
-* `plink` and `pscp`, an open source CLI SSH/SCP clients, [download](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)
-* `SharpRDP`, an open source command executor using RDP, [download](https://github.com/vildibald/SharpRDP/releases/tag/v1.0.0)
-* `WMImplant`, as open source PowerShell WMI command executor, [download](https://github.com/vildibald/WMImplant)   
-
 ### Set log level
 
 If you wish to change the logging level:
@@ -39,6 +29,17 @@ Run
 Right now, this app works only on Windows and the target computer must use also Windows.
 
 Compiled executable is located at `target/release/gargamel.exe`.
+
+Make sure to have the following programs in the same directory as Gargamel.
+* `psexec`, [download](https://docs.microsoft.com/en-us/sysinternals/downloads/psexec)
+* `paexec`, an open source alternative to PsExec, [download](https://www.poweradmin.com/paexec/)
+* `winpmem`, an open source memory image tool, [download](https://github.com/Velocidex/c-aff4/releases).
+     * Download the newest executable and rename it to *winpmem.exe*
+* `plink` and `pscp`, an open source CLI SSH/SCP clients, [download](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)
+* `SharpRDP`, an open source command executor using RDP, [download](https://github.com/vildibald/SharpRDP/releases/tag/v1.0.0)
+* `WMImplant`, as open source PowerShell WMI command executor, [download](https://github.com/vildibald/WMImplant)
+* `7za.exe`, a standalone console version of 7zip archiver, [download](https://www.7-zip.org/download.html)   
+
 
 Help:
 ```bash
