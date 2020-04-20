@@ -8,6 +8,7 @@ use std::time::Duration;
 pub struct Rdp {
     pub computer: Computer,
     pub nla: bool,
+    pub remote_temp_storage: PathBuf
 }
 
 impl Connector for Rdp {
@@ -21,6 +22,10 @@ impl Connector for Rdp {
 
     fn copier(&self) -> &dyn RemoteFileCopier {
         self as &dyn RemoteFileCopier
+    }
+
+    fn remote_temp_storage(&self) -> &Path {
+        self.remote_temp_storage.as_path()
     }
 
     fn connect_and_run_command(

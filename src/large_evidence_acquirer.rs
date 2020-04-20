@@ -1,5 +1,4 @@
 use crate::process_runner::create_report_path;
-use crate::utils::remote_storage;
 use std::path::Path;
 use crate::remote::{Connector, Compression, CompressCopier, RemoteFileCopier, Command};
 use std::time::Duration;
@@ -11,14 +10,14 @@ pub(crate) struct LargeEvidenceAcquirer<'a> {
     pub(crate) compress_timeout: Option<Duration>,
     pub(crate) compression: Compression,
     pub(crate) report_extension: &'a str,
-    pub(crate) overwrite_switch: Option<&'a str>,
+    pub(crate) overwrite_switch: Option<&'a str>
 }
 
 impl<'a> LargeEvidenceAcquirer<'a> {
     pub(crate) fn run(
         &self,
         command: &[String],
-        report_filename_prefix: &str,
+        report_filename_prefix: &str
     ) {
         if command.is_empty() {
             return;
@@ -31,7 +30,7 @@ impl<'a> LargeEvidenceAcquirer<'a> {
             self.report_extension,
         );
 
-        let remote_report_path = remote_storage()
+        let remote_report_path = self.connector.remote_temp_storage()
             .join(report_path.file_name().unwrap())
             .to_string_lossy()
             .to_string();

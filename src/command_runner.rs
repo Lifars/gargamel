@@ -14,10 +14,11 @@ impl<'a> CommandRunner<'a> {
     pub fn psexec(
         remote_computer: Computer,
         local_store_directory: &'a Path,
+        remote_temp_storage: PathBuf
     ) -> CommandRunner<'a> {
         CommandRunner {
             local_store_directory,
-            connector: Box::new(PsExec::paexec(remote_computer)),
+            connector: Box::new(PsExec::paexec(remote_computer, remote_temp_storage)),
             run_implicit: true,
         }
     }
@@ -25,10 +26,11 @@ impl<'a> CommandRunner<'a> {
     pub fn wmi(
         remote_computer: Computer,
         local_store_directory: &'a Path,
+        remote_temp_storage: PathBuf
     ) -> CommandRunner<'a> {
         CommandRunner {
             local_store_directory,
-            connector: Box::new(Wmi { computer: remote_computer, }),
+            connector: Box::new(Wmi { computer: remote_computer, remote_temp_storage}),
             run_implicit: true,
         }
     }
@@ -46,10 +48,11 @@ impl<'a> CommandRunner<'a> {
     pub fn psremote(
         remote_computer: Computer,
         local_store_directory: &'a Path,
+        remote_temp_storage: PathBuf
     ) -> CommandRunner<'a> {
         CommandRunner {
             local_store_directory,
-            connector: Box::new(PsRemote::new(remote_computer)),
+            connector: Box::new(PsRemote::new(remote_computer, remote_temp_storage)),
             run_implicit: true,
         }
     }
@@ -58,12 +61,14 @@ impl<'a> CommandRunner<'a> {
         remote_computer: Computer,
         local_store_directory: &'a Path,
         nla: bool,
+        remote_temp_storage: PathBuf
     ) -> CommandRunner<'a> {
         CommandRunner {
             local_store_directory,
             connector: Box::new(Rdp {
                 computer: remote_computer,
                 nla,
+                remote_temp_storage
             }),
             run_implicit: true,
         }

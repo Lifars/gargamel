@@ -1,18 +1,20 @@
 use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, WindowsRemoteFileHandler};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::io;
 use crate::process_runner::run_process_blocking;
 
 pub struct PsRemote {
     computer: Computer,
     copier: WindowsRemoteFileHandler,
+    remote_temp_storage: PathBuf
 }
 
 impl PsRemote {
-    pub fn new(computer: Computer) -> PsRemote {
+    pub fn new(computer: Computer, remote_temp_storage: PathBuf) -> PsRemote {
         PsRemote {
             computer: computer.clone(),
             copier: WindowsRemoteFileHandler::new(computer, Box::new(Powershell {})),
+            remote_temp_storage
         }
     }
 }
@@ -27,6 +29,10 @@ impl Connector for PsRemote {
 
     fn copier(&self) -> &dyn RemoteFileCopier {
         &self.copier
+    }
+
+    fn remote_temp_storage(&self) -> &Path {
+        self.remote_temp_storage.as_path()
     }
 
     fn prepare_command(&self,

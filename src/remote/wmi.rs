@@ -6,6 +6,7 @@ use std::time::Duration;
 
 pub struct Wmi {
     pub computer: Computer,
+    pub remote_temp_storage: PathBuf
 }
 
 impl Connector for Wmi {
@@ -19,6 +20,10 @@ impl Connector for Wmi {
 
     fn copier(&self) -> &dyn RemoteFileCopier {
         self as &dyn RemoteFileCopier
+    }
+
+    fn remote_temp_storage(&self) -> &Path {
+        self.remote_temp_storage.as_path()
     }
 
     fn prepare_command(&self,

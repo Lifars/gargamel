@@ -48,20 +48,22 @@ impl<'a> EvidenceAcquirer<'a> {
     pub fn psexec(
         remote_computer: Computer,
         store_directory: &'a Path,
+        remote_temp_storage: PathBuf
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
             store_directory,
-            Box::new(PsExec::paexec(remote_computer)),
+            Box::new(PsExec::paexec(remote_computer, remote_temp_storage)),
         )
     }
 
     pub fn psremote(
         remote_computer: Computer,
         store_directory: &'a Path,
+        remote_temp_storage: PathBuf
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
             store_directory,
-            Box::new(PsRemote::new(remote_computer)),
+            Box::new(PsRemote::new(remote_computer, remote_temp_storage)),
         )
     }
 
@@ -77,12 +79,14 @@ impl<'a> EvidenceAcquirer<'a> {
     pub fn wmi(
         remote_computer: Computer,
         store_directory: &'a Path,
+        remote_temp_storage: PathBuf
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
             store_directory,
             Box::new(Wmi {
                 computer: remote_computer,
-            }),
+                remote_temp_storage
+            })
         )
     }
 
@@ -90,20 +94,22 @@ impl<'a> EvidenceAcquirer<'a> {
         remote_computer: Computer,
         store_directory: &'a Path,
         nla: bool,
+        remote_temp_storage: PathBuf
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new_standard_acquirer(
             store_directory,
             Box::new(Rdp {
                 nla,
-                computer: remote_computer
-            }),
+                computer: remote_computer,
+                remote_temp_storage
+            })
         )
     }
 
     pub fn ssh(
         remote_computer: Computer,
         store_directory: &'a Path,
-        key_file: Option<PathBuf>
+        key_file: Option<PathBuf>,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer {
             store_directory,
@@ -138,7 +144,7 @@ impl<'a> EvidenceAcquirer<'a> {
             command.to_vec(),
             Some(&self.store_directory),
             report_filename_prefix,
-            false,
+            false
         );
 
         info!("{}: Checking {}",

@@ -1,9 +1,6 @@
-use std::path::Path;
-use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression};
-use crate::process_runner::create_report_path;
-use std::thread;
+use std::path::{Path, PathBuf};
+use crate::remote::{Computer, Connector, PsExec, PsRemote, Rdp, Wmi, Compression};
 use std::time::Duration;
-use crate::utils::remote_storage;
 use crate::large_evidence_acquirer::LargeEvidenceAcquirer;
 
 pub struct RegistryAcquirer<'a> {
@@ -64,10 +61,11 @@ impl<'a> RegistryAcquirer<'a> {
         store_directory: &'a Path,
         computer: Computer,
         no_7zip: bool,
+        remote_temp_storage: PathBuf
     ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(PsExec::psexec(computer)),
+            Box::new(PsExec::psexec(computer, remote_temp_storage)),
             None,
             if no_7zip { Compression::No } else { Compression::Yes },
         )
@@ -77,10 +75,11 @@ impl<'a> RegistryAcquirer<'a> {
         store_directory: &'a Path,
         computer: Computer,
         _no_7zip: bool,
+        remote_temp_storage: PathBuf
     ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(PsRemote::new(computer)),
+            Box::new(PsRemote::new(computer, remote_temp_storage)),
             None,
             Compression::No,
         )
@@ -91,10 +90,11 @@ impl<'a> RegistryAcquirer<'a> {
         computer: Computer,
         compress_timeout: Duration,
         no_7zip: bool,
+        remote_temp_storage: PathBuf
     ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(Wmi { computer }),
+            Box::new(Wmi { computer, remote_temp_storage }),
             Some(compress_timeout),
             if no_7zip { Compression::No } else { Compression::YesSplit }
         )
@@ -106,10 +106,11 @@ impl<'a> RegistryAcquirer<'a> {
         compress_timeout: Duration,
         nla: bool,
         no_7zip: bool,
+        remote_temp_storage: PathBuf
     ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(Rdp { computer, nla }),
+            Box::new(Rdp { computer, nla, remote_temp_storage }),
             Some(compress_timeout),
             if no_7zip { Compression::No } else { Compression::YesSplit }
         )

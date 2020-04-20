@@ -1,8 +1,8 @@
 use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{io, thread};
 use std::time::Duration;
-use crate::utils::{remote_storage, remote_storage_file};
+use crate::process_runner::create_report_path;
 
 pub struct MemoryAcquirer<'a> {
     pub local_store_directory: &'a Path,
@@ -17,10 +17,11 @@ impl<'a> MemoryAcquirer<'a> {
         remote_computer: Computer,
         local_store_directory: &'a Path,
         no_7zip: bool,
+        remote_temp_storage: PathBuf
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
-            connector: Box::new(PsExec::psexec(remote_computer)),
+            connector: Box::new(PsExec::psexec(remote_computer, remote_temp_storage)),
             image_timeout: None,
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },
@@ -31,10 +32,11 @@ impl<'a> MemoryAcquirer<'a> {
         remote_computer: Computer,
         local_store_directory: &'a Path,
         _no_7zip: bool,
+        remote_temp_storage: PathBuf
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
-            connector: Box::new(PsRemote::new(remote_computer)),
+            connector: Box::new(PsRemote::new(remote_computer, remote_temp_storage)),
             image_timeout: None,
             compress_timeout: None,
             compression: Compression::No,
@@ -47,10 +49,11 @@ impl<'a> MemoryAcquirer<'a> {
         timeout: Duration,
         compress_timeout: Duration,
         no_7zip: bool,
+        remote_temp_storage: PathBuf
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
-            connector: Box::new(Wmi { computer: remote_computer.clone() }),
+            connector: Box::new(Wmi { computer: remote_computer.clone(), remote_temp_storage }),
             image_timeout: Some(timeout),
             compress_timeout: Some(compress_timeout),
             compression: if no_7zip { Compression::No } else { Compression::YesSplit },
@@ -64,12 +67,14 @@ impl<'a> MemoryAcquirer<'a> {
         image_timeout: Duration,
         compress_timeout: Duration,
         no_7zip: bool,
+        remote_temp_storage: PathBuf
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
             connector: Box::new(Rdp {
                 nla,
                 computer: remote_computer.clone(),
+                remote_temp_storage
             }),
             image_timeout: Some(image_timeout),
             compress_timeout: Some(compress_timeout),
@@ -78,19 +83,19 @@ impl<'a> MemoryAcquirer<'a> {
     }
 
     pub fn image_memory(
-        &self,
-        target_name: &Path,
+        &self
     ) -> io::Result<()> {
         let local_store_directory = self.local_store_directory;
         let winpmem = "winpmem.exe";
 
         // let target_name = remote_storage_file(target_name.file_name().unwrap());
-        let target_name = match target_name.parent() {
-            None => remote_storage_file(target_name.file_name().unwrap()),
-            Some(_) => target_name.to_owned(),
-        };
-
-        let target_store = target_name.parent().unwrap();
+        let target_name = create_report_path(
+            self.connector.computer(),
+            self.connector.remote_temp_storage(),
+            "mem-image",
+            self.connector.connect_method_name(),
+            ".aff4"
+        );
         let connection = Command {
             command: vec![
                 winpmem.to_string(),
@@ -132,7 +137,7 @@ impl<'a> MemoryAcquirer<'a> {
             }
         }
         thread::sleep(Duration::from_millis(1000));
-        let winpem_path = target_store.join(winpmem);
+        let winpem_path = self.connector.remote_temp_storage().join(winpmem);
         match copier.delete_remote_file(&winpem_path) {
             Ok(_) => {}
             Err(err) => {

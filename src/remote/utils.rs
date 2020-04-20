@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use std::io::{Error, Read};
+use std::io::Read;
 
 pub fn file_is_empty(target_downloaded: &Path) -> bool {
     let mut file = match File::open(target_downloaded){

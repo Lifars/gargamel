@@ -5,7 +5,6 @@ use std::path::Path;
 use crate::arg_parser::Opts;
 use std::time::Duration;
 use crate::remote::RemoteFileCopier;
-use crate::utils::remote_storage;
 
 #[derive(Clone)]
 pub struct Computer {
@@ -67,6 +66,8 @@ pub trait Connector {
 
     fn copier(&self) -> &dyn RemoteFileCopier;
 
+    fn remote_temp_storage(&self) -> &Path;
+
     fn connect_and_run_local_program_in_current_directory(
         &self,
         command_to_run: Command<'_>,
@@ -92,7 +93,7 @@ pub trait Connector {
         timeout: Option<Duration>
     ) -> Result<()> {
         let local_program_path = Path::new(command_to_run.command.first().unwrap());
-        let remote_storage = remote_storage();
+        let remote_storage = self.remote_temp_storage();
         let copier = self.copier();
         copier.copy_to_remote(&local_program_path, &remote_storage)?;
         thread::sleep(Duration::from_millis(20_000));

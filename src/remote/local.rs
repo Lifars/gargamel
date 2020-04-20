@@ -50,6 +50,10 @@ impl Connector for Local {
     ) -> io::Result<()> {
         self.connect_and_run_command(command_to_run, timeout)
     }
+
+    fn remote_temp_storage(&self) -> &Path {
+        Path::new("C:\\Users\\Public")
+    }
 }
 
 impl FileCopier for Local {

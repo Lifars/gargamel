@@ -1,7 +1,6 @@
 use std::path::Path;
 use crate::remote::{RemoteFileCopier, file_is_empty, path_to_part};
-use std::{io, thread};
-use std::num::ParseIntError;
+use std::thread;
 use std::time::Duration;
 
 pub struct ReDownloader<'a> {
@@ -13,7 +12,7 @@ impl<'a> ReDownloader<'a> {
     pub fn retry_download(&self, remote_path: &Path) -> bool {
         let extension = remote_path.extension().unwrap().to_string_lossy();
         match extension.parse::<u32>() {
-            Ok(part) => self.download_as_splitted(remote_path),
+            Ok(_) => self.download_as_splitted(remote_path),
             Err(_) => {
                 let success = self.download_as_non_splitted(remote_path);
                 if !success {
@@ -87,7 +86,9 @@ impl<'a> ReDownloader<'a> {
 
     fn download_as_is(&self, remote_path: &Path) -> bool {
         if !self.target_dir.exists() {
-            std::fs::create_dir_all(self.target_dir);
+           if let Err(err) =  std::fs::create_dir_all(self.target_dir){
+               error!("{}", err)
+           }
         }
         if let Err(err) = self.copier.copy_from_remote(remote_path, self.target_dir) {
             debug!("{}", err)

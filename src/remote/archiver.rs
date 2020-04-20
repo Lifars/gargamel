@@ -2,8 +2,7 @@ use crate::remote::{Connector, Command, Local, FileCopier, RemoteFileCopier, Com
 use std::path::{Path, PathBuf};
 use std::{io, thread};
 use std::time::Duration;
-use std::io::{Error, Read};
-use std::fs::File;
+use std::io::Error;
 
 #[derive(Clone, Copy)]
 pub enum Compression {

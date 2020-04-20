@@ -1,27 +1,31 @@
 use crate::remote::{Connector, Computer, Command, RemoteFileCopier, Cmd, WindowsRemoteFileHandler};
 use std::time::Duration;
 use std::io::Error;
+use std::path::{PathBuf, Path};
 
 pub struct PsExec {
     computer: Computer,
     copier: WindowsRemoteFileHandler,
-    psexec_name: String
+    psexec_name: String,
+    remote_temp_storage: PathBuf
 }
 
 impl PsExec {
-    pub fn paexec(computer: Computer) -> PsExec {
+    pub fn paexec(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
         PsExec {
             computer: computer.clone(),
             copier: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
-            psexec_name: "paexec.exe".to_string()
+            psexec_name: "paexec.exe".to_string(),
+            remote_temp_storage
         }
     }
 
-    pub fn psexec(computer: Computer) -> PsExec {
+    pub fn psexec(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
         PsExec {
             computer: computer.clone(),
             copier: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
-            psexec_name: "PsExec64.exe".to_string()
+            psexec_name: "PsExec64.exe".to_string(),
+            remote_temp_storage
         }
     }
 }
@@ -37,6 +41,10 @@ impl Connector for PsExec {
 
     fn copier(&self) -> &dyn RemoteFileCopier {
         &self.copier
+    }
+
+    fn remote_temp_storage(&self) -> &Path {
+        self.remote_temp_storage.as_path()
     }
 
     fn connect_and_run_local_program(&self,

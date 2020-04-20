@@ -23,6 +23,10 @@ impl Connector for Ssh {
         self as &dyn RemoteFileCopier
     }
 
+    fn remote_temp_storage(&self) -> &Path {
+        Path::new("/tmp")
+    }
+
     fn connect_and_run_command(&self,
                                remote_connection: Command<'_>,
                                _timeout: Option<Duration>
