@@ -92,7 +92,7 @@ pub struct Opts {
     #[clap(
     long = "wmi",
     help = "Acquire evidence from Windows machine using WMI. \
-    Requires WMImplant.ps1 in the current directory or in the path and PowerShell 3.0+ on the host machine.\
+    Requires WMImplant.ps1 in the current directory or in the path and PowerShell 3.0+ on the host machine. \
     Note: It is necessary to disable Windows Defender real-time protection (other AVs not tested)."
     )]
     pub wmi: bool,

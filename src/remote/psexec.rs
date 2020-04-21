@@ -1,11 +1,12 @@
-use crate::remote::{Connector, Computer, Command, RemoteFileCopier, Cmd, WindowsRemoteFileHandler};
+use crate::remote::{Connector, Computer, Command, RemoteFileCopier, Cmd, WindowsRemoteFileHandler, FileCopier};
 use std::time::Duration;
 use std::io::Error;
 use std::path::{PathBuf, Path};
+use std::io;
 
 pub struct PsExec {
     computer: Computer,
-    copier: WindowsRemoteFileHandler,
+    copier_impl: WindowsRemoteFileHandler,
     psexec_name: String,
     remote_temp_storage: PathBuf
 }
@@ -14,7 +15,7 @@ impl PsExec {
     pub fn paexec(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
         PsExec {
             computer: computer.clone(),
-            copier: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
             psexec_name: "paexec.exe".to_string(),
             remote_temp_storage
         }
@@ -23,7 +24,7 @@ impl PsExec {
     pub fn psexec(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
         PsExec {
             computer: computer.clone(),
-            copier: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
             psexec_name: "PsExec64.exe".to_string(),
             remote_temp_storage
         }
@@ -40,7 +41,7 @@ impl Connector for PsExec {
     }
 
     fn copier(&self) -> &dyn RemoteFileCopier {
-        &self.copier
+        self as &dyn RemoteFileCopier
     }
 
     fn remote_temp_storage(&self) -> &Path {
@@ -91,5 +92,46 @@ impl Connector for PsExec {
                 prepared_command
             }
         }
+    }
+}
+
+impl RemoteFileCopier for PsExec {
+    fn remote_computer(&self) -> &Computer {
+        self.computer()
+    }
+
+    fn copier_impl(&self) -> &dyn FileCopier {
+        self.copier_impl.copier_impl()
+    }
+
+    fn path_to_remote_form(&self, path: &Path) -> PathBuf {
+        self.copier_impl.path_to_remote_form(path)
+    }
+
+    fn copy_to_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
+        self.copier_impl.copy_from_remote(source, target)
+    }
+
+    fn delete_remote_file(&self, target: &Path) -> io::Result<()> {
+       self.connect_and_run_command(
+           Command{
+               command: vec![
+                   "cmd".to_string(),
+                   "/c".to_string(),
+                   "del".to_string(),
+                   "/F".to_string(),
+                   "/Q".to_string(),
+                   target.to_string_lossy().to_string(),
+               ],
+               report_store_directory: None,
+               report_filename_prefix: "",
+               elevated: false
+           },
+           None
+       )
+    }
+
+    fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
+        self.copier_impl.copy_from_remote(source, target)
     }
 }

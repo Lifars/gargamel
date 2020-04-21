@@ -94,7 +94,7 @@ impl<'a> MemoryAcquirer<'a> {
             self.connector.remote_temp_storage(),
             "mem-image",
             self.connector.connect_method_name(),
-            ".aff4"
+            "aff4"
         );
         let connection = Command {
             command: vec![

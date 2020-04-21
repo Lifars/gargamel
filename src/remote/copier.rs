@@ -89,7 +89,6 @@ pub trait RemoteFileCopier {
     }
 }
 
-/// Use factory mathods to properly initialize the struct.
 pub struct WindowsRemoteFileHandler {
     computer: Computer,
     copier_impl: Box<dyn FileCopier>,
@@ -133,6 +132,26 @@ impl WindowsRemoteFileHandler {
         ));
         WindowsRemoteFileHandler { computer, copier_impl }
     }
+
+    fn open_connection(
+        &self
+    ) {
+        let mut args = vec![
+            "USE".to_string(),
+            format!("\\\\{}", self.computer.address),
+        ];
+        let username = self.computer.domain_username();
+        args.push(format!("/u:{}", username));
+        if let Some(password) = &self.computer.password {
+            args.push(password.clone());
+        }
+        run_process_blocking(
+            "NET",
+            &args,
+        ).expect(&format!(
+            "Cannot establish connection using \"net use\" to {}", &self.computer.address
+        ));
+    }
 }
 
 impl RemoteFileCopier for WindowsRemoteFileHandler {
@@ -148,6 +167,7 @@ impl RemoteFileCopier for WindowsRemoteFileHandler {
         &self,
         path: &Path,
     ) -> PathBuf {
+        self.open_connection();
         PathBuf::from(format!(
             "\\\\{}\\{}",
             self.remote_computer().address,
