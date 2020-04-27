@@ -39,8 +39,8 @@ mod command_runner;
 fn setup_logger() {
     CombinedLogger::init(
         vec![
-            TermLogger::new(LevelFilter::Trace, Config::default(), TerminalMode::Mixed).unwrap(),
-            WriteLogger::new(LevelFilter::Trace, Config::default(), File::create("gargamel.log").unwrap()),
+            TermLogger::new(LevelFilter::Info, Config::default(), TerminalMode::Mixed).unwrap(),
+            WriteLogger::new(LevelFilter::Info, Config::default(), File::create("gargamel.log").unwrap()),
         ]
     ).unwrap();
 }
