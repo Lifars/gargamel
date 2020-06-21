@@ -26,7 +26,7 @@ If you wish to change the logging level:
 User guide
 ----------
 
-Right now, this app works only on Windows and the target computer must use also Windows.
+Right now, this app works only on Windows and the target computer must use Windows or Linux.
 
 Compiled executable is located at `target/release/gargamel.exe`.
 
@@ -64,8 +64,7 @@ gargamel.exe -c 192.168.42.47 -u Jano --psexec -o testResults
 Gargamel will ask you for password of the remote user, in our example `nbusr123`.
 Note that password will be hidden when typing.
 
-
-It is also possible to specify the password right as program argument.   
+It is also possible to specify the password directly as program argument.   
 
 ```bash
 gargamel.exe -c 192.168.42.47 -u Jano --psexec -p nbusr123 -o testResults
@@ -127,9 +126,11 @@ If you wish to acquire ONLY the memory dump without other evidence then use the 
 gargamel.exe -c 192.168.42.47 -u Jano --psexec -o testResults -m --no-events-search --no-evidence-search --no-registry-search                                                          
 ```
 
+This functionality is available only for Windows targets.
+
 #### Run custom commands
 
-You may run custom Windows CMD or Linux shell commands on remote machine using Gargamel.
+Gargamel may run custom Windows CMD or Linux shell commands on remote machine.
 
 First create a file `custom-commands.txt` with the following content.
 
@@ -157,7 +158,7 @@ First create a file `custom-files.txt` with the following content.
 ```bash
 C:\Users\Public\sss*
 C:\Users\Jano\danove.pdf 
-# This and next line will be ignored
+# This line and the next one will be ignored
 # C:\Users\Jano\somBajecny.pptx  
 ```  
 
