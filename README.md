@@ -93,13 +93,13 @@ gargamel.exe -c JanovPC -u Jano -d WORKSPACE --psexec -p nbusr123 -o testResults
 
 #### Other connection methods
 
-PsExec is one of 5 supported connection methods.
+PsExec is one of the 5 supported connection methods.
 You can replace the `--psexec` with the following options:
 * `--psexec`
-* `--psrem`, if PowerShell remoting is configured on target machine.
-* `--rdp`, if RDP is enabled on target machine.
+* `--psrem`, if PowerShell remoting is configured on the target machine.
+* `--rdp`, if RDP is enabled on the target machine.
 * `--wmi`.
-* `--ssh`, if target machine uses Linux.
+* `--ssh`, if the target machine uses Linux.
 
 It is possible to use several methods at once. 
 For example to use both PsExec and RDP one can use the following command.
