@@ -1,4 +1,6 @@
 ![alt text](logo.png "Gargamel")
+
+Gargamel
 ========
 
 Compile
