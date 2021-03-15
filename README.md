@@ -1,3 +1,5 @@
+![alt text](logo.png "Gargamel")
+
 Gargamel
 ========
 
@@ -16,6 +18,9 @@ Debug build can be compiled using
 ```bash
 cargo build
 ```
+
+Compiled executable is located at `target/release/gargamel.exe` or `target/debug/gargamel.exe`, respectively.
+
 ### Set log level
 
 If you wish to change the logging level:
@@ -28,8 +33,6 @@ User guide
 
 Right now, this app works only on Windows and the target computer must use Windows or Linux.
 
-Compiled executable is located at `target/release/gargamel.exe`.
-
 Make sure to have the following programs in the same directory as Gargamel.
 * `psexec`, [download](https://docs.microsoft.com/en-us/sysinternals/downloads/psexec)
 * `paexec`, an open source alternative to PsExec, [download](https://www.poweradmin.com/paexec/)
@@ -40,6 +43,8 @@ Make sure to have the following programs in the same directory as Gargamel.
 * `WMImplant`, as open source PowerShell WMI command executor, [download](https://github.com/vildibald/WMImplant)
 * `7za.exe`, a standalone console version of 7zip archiver, [download](https://www.7-zip.org/download.html)   
 
+Note: We need both the `psexec` and `paexec`. Although both applications are supposed to be functionally equivalent they actually both have different behavior under some circumstances.
+
 ### Unleashing the power of Gargamel
 
 Gargamel needs to be launched from an elevated terminal to be fully functional.
@@ -48,20 +53,20 @@ When running with limited user privileges, then some operations like target memo
 
 #### Basic example
 
-Assume you want to connect to computer with the following parameters:
+Assume you want to connect to a computer with the following parameters:
 * address `192.168.42.47`
 * username `Jano`
 * password `nbusr123`
 
 The following command will acquire firewall state, network state, logged users, running processes, 
 active network connections, registry, system & application event logs using PsExec method.
-Evidence will be stored in a `testResults` directory relative to the location of Gargamel.
+Evidence will be stored in the `testResults` directory relative to the location of Gargamel.
 
 ```bash
 gargamel.exe -c 192.168.42.47 -u Jano --psexec -o testResults
 ```
 
-Gargamel will ask you for password of the remote user, in our example `nbusr123`.
+Gargamel will ask you for password of the remote user, in our example the password is `nbusr123`.
 Note that password will be hidden when typing.
 
 It is also possible to specify the password directly as program argument.   
@@ -72,7 +77,7 @@ gargamel.exe -c 192.168.42.47 -u Jano --psexec -p nbusr123 -o testResults
 
 #### Domain example
 
-Assume you want to connect to computer in domain with the following parameters:
+Assume you want to connect to a computer in a domain with the following parameters:
 * domain `WORKSPACE`
 * computer name `JanovPC`
 * username `Jano`
@@ -110,7 +115,7 @@ gargamel.exe -c 192.168.42.47 -u Jano --psexec --rdp -o testResults
 
 There is also a special switch `--all` that is equal to specifying `--psexec --rdp --psrem --wmi`.
 
-###### Note: Launch parameters are order-agnostic, i.e. it does not matter in which order the parameters are specified.
+Note: Launch parameters are order-agnostic, i.e. it does not matter in which order the parameters are specified.
 
 #### Acquire memory
 
