@@ -1,23 +1,24 @@
-use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, WindowsRemoteFileHandler};
+use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, WindowsRemoteFileHandler, copy_from_remote_wildcards};
 use std::path::{Path, PathBuf};
 use std::io;
 use crate::process_runner::run_process_blocking;
 
 pub struct PsRemote {
     computer: Computer,
-    copier: WindowsRemoteFileHandler,
-    remote_temp_storage: PathBuf
+    copier_impl: WindowsRemoteFileHandler,
+    remote_temp_storage: PathBuf,
 }
 
 impl PsRemote {
     pub fn new(computer: Computer, remote_temp_storage: PathBuf) -> PsRemote {
         PsRemote {
             computer: computer.clone(),
-            copier: WindowsRemoteFileHandler::new(computer, Box::new(Powershell {})),
-            remote_temp_storage
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Powershell {})),
+            remote_temp_storage,
         }
     }
 }
+
 impl Connector for PsRemote {
     fn connect_method_name(&self) -> &'static str {
         return "PSREM";
@@ -28,7 +29,7 @@ impl Connector for PsRemote {
     }
 
     fn copier(&self) -> &dyn RemoteFileCopier {
-        &self.copier
+        &self.copier_impl
     }
 
     fn remote_temp_storage(&self) -> &Path {
@@ -51,14 +52,7 @@ impl Connector for PsRemote {
             "-ScriptBlock".to_string(),
             "{".to_string(),
         ];
-//        if elevated {
-//            prepared_command.push("start-process".to_string());
-//            prepared_command.push(format!("'{}'", command[0].clone()));
-//            prepared_command.push("-argumentlist".to_string());
-//            prepared_command.push(format!("'{}'", command[1..].join(" ")));
-//        } else {
-            prepared_command.extend(command);
-//        }
+        prepared_command.extend(command);
         let username = remote_computer.domain_username();
         let credential = match &remote_computer.password {
             None => username,
@@ -80,6 +74,37 @@ impl Connector for PsRemote {
                 prepared_command
             }
         }
+    }
+}
+
+impl RemoteFileCopier for PsRemote {
+    fn remote_computer(&self) -> &Computer {
+        self.computer()
+    }
+
+    fn copier_impl(&self) -> &dyn FileCopier {
+        self.copier_impl.copier_impl()
+    }
+
+    fn path_to_remote_form(&self, path: &Path) -> PathBuf {
+        self.copier_impl.path_to_remote_form(path)
+    }
+
+    fn copy_to_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
+        self.copier_impl.copy_from_remote(source, target)
+    }
+
+    fn delete_remote_file(&self, target: &Path) -> io::Result<()> {
+        self.copier_impl.delete_remote_file(target)
+    }
+
+    fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
+        copy_from_remote_wildcards(
+            source,
+            target,
+            self,
+            |s, t| self.copier_impl.copy_from_remote(s, t),
+        )
     }
 }
 

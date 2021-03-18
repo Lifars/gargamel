@@ -114,8 +114,8 @@ impl<'a> MemoryAcquirer<'a> {
             self.image_timeout,
         )?;
         let _copier = self.connector.copier();
-        let _compression_split_copier = CompressCopier::new(self.connector.as_ref(), true, self.compress_timeout);
-        let _compression_copier = CompressCopier::new(self.connector.as_ref(), false, self.compress_timeout);
+        let _compression_split_copier = CompressCopier::new(self.connector.as_ref(), true, self.compress_timeout, false);
+        let _compression_copier = CompressCopier::new(self.connector.as_ref(), false, self.compress_timeout, false);
         let copier = match self.compression {
             Compression::No => _copier,
             Compression::Yes => &_compression_copier as &dyn RemoteFileCopier,

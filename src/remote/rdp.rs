@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, FileCopier, Command, RemoteFileCopier};
+use crate::remote::{Connector, Computer, FileCopier, Command, RemoteFileCopier, copy_from_remote_wildcards};
 use std::path::{Path, PathBuf};
 use std::io;
 use crate::process_runner::{run_process_blocking, create_report_path};
@@ -211,7 +211,12 @@ impl RemoteFileCopier for Rdp {
         source: &Path,
         target: &Path,
     ) -> io::Result<()> {
-        self.copier_impl().copy_file(source, &self.path_to_remote_form(target))
+        copy_from_remote_wildcards(
+            source,
+            target,
+            self,
+            |source, target| self.copier_impl().copy_file(source, &self.path_to_remote_form(target)),
+        )
     }
 }
 

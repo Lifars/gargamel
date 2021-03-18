@@ -1,7 +1,9 @@
-use std::path::{Path, PathBuf};
-use crate::remote::Computer;
+use std::path::{Path, PathBuf, Component};
+use crate::remote::{Computer, Connector};
 use std::io;
 use crate::process_runner::run_process_blocking;
+use std::env::temp_dir;
+use wildmatch::WildMatch;
 
 pub trait FileCopier {
     fn copy_file(
@@ -86,6 +88,57 @@ pub trait RemoteFileCopier {
 
     fn method_name(&self) -> &'static str {
         self.copier_impl().method_name()
+    }
+}
+
+pub fn copy_from_remote_wildcards<F>(
+    source: &Path,
+    target: &Path,
+    connector: &dyn Connector,
+    copy_fn: F,
+) -> io::Result<()>
+    where F: Fn(&Path, &Path) -> io::Result<()> {
+    trace!("Copier supports wildcards");
+    let dir = source
+        .components()
+        .take_while(|item| !item.as_os_str().to_str().unwrap_or_default().contains("*"))
+        .map(|item| item.as_os_str())
+        .collect::<PathBuf>();
+
+    let wildcarded = source
+        .components()
+        .skip_while(|item| !item.as_os_str().to_str().unwrap_or_default().contains("*"))
+        .take(1)
+        .collect::<Vec<Component>>()
+        .get(0)
+        .map(|it| it.as_os_str().to_string_lossy());
+
+    let rem = source
+        .components()
+        .skip_while(|item| !item.as_os_str().to_str().unwrap_or_default().contains("*"))
+        .skip(1)
+        .map(|item| item.as_os_str())
+        .collect::<PathBuf>();
+
+    if dir.components().count() >= source.components().count() - 1 {
+        copy_fn(source, target)
+    } else {
+        let wildcarded = wildcarded.unwrap();
+        connector
+            .list_dirs(&dir, &temp_dir())
+            .iter()
+            .filter(|path_item| {
+                trace!("Matching {} with {}", &wildcarded, path_item);
+                WildMatch::new(&wildcarded).matches(path_item) }
+            )
+            .for_each(|item| {
+                let src = dir.join(item).join(&rem);
+                debug!("Copying wildcarded path {} to {}", src.display(), target.display());
+                if copy_fn(&src, target).is_err() {
+                    error!("Error remote {} copying from {} to {}", connector.computer().address, src.display(), target.display())
+                }
+            });
+        Ok(())
     }
 }
 
@@ -175,29 +228,3 @@ impl RemoteFileCopier for WindowsRemoteFileHandler {
         ))
     }
 }
-
-// pub struct Downloader<'a> {
-//     remote_copier: &'a RemoteCopier<'a>
-// }
-//
-// pub struct Uploader<'a> {
-//     remote_copier: &'a RemoteCopier<'a>
-// }
-//
-// impl<'a> Copier for Downloader<'a> {
-//     fn copy_file(&self,
-//                  source: &Path,
-//                  target: &Path,
-//     ) -> io::Result<()> {
-//         self.remote_copier.copy_from_remote(source, target)
-//     }
-// }
-//
-// impl<'a> Copier for Uploader<'a> {
-//     fn copy_file(&self,
-//                  source: &Path,
-//                  target: &Path,
-//     ) -> io::Result<()> {
-//         self.remote_copier.copy_to_remote(source, target)
-//     }
-// }

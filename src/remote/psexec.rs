@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, RemoteFileCopier, Cmd, WindowsRemoteFileHandler, FileCopier};
+use crate::remote::{Connector, Computer, Command, RemoteFileCopier, Cmd, WindowsRemoteFileHandler, FileCopier, copy_from_remote_wildcards};
 use std::time::Duration;
 use std::io::Error;
 use std::path::{PathBuf, Path};
@@ -8,7 +8,8 @@ pub struct PsExec {
     computer: Computer,
     copier_impl: WindowsRemoteFileHandler,
     psexec_name: String,
-    remote_temp_storage: PathBuf
+    remote_temp_storage: PathBuf,
+    ms_psexec: bool,
 }
 
 impl PsExec {
@@ -17,7 +18,8 @@ impl PsExec {
             computer: computer.clone(),
             copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
             psexec_name: "paexec.exe".to_string(),
-            remote_temp_storage
+            remote_temp_storage,
+            ms_psexec: false,
         }
     }
 
@@ -26,7 +28,8 @@ impl PsExec {
             computer: computer.clone(),
             copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
             psexec_name: "PsExec64.exe".to_string(),
-            remote_temp_storage
+            remote_temp_storage,
+            ms_psexec: true,
         }
     }
 }
@@ -50,11 +53,15 @@ impl Connector for PsExec {
 
     fn connect_and_run_local_program(&self,
                                      command_to_run: Command<'_>,
-                                     timeout: Option<Duration>
+                                     timeout: Option<Duration>,
     ) -> Result<(), Error> {
         let mut command = command_to_run.command;
+        if self.ms_psexec {
+            command.insert(0, "-accepteula".to_string());
+        }
         command.insert(0, "-c".to_string());
         command.insert(0, "-f".to_string());
+
         let command_to_run = Command {
             command,
             ..command_to_run
@@ -113,25 +120,30 @@ impl RemoteFileCopier for PsExec {
     }
 
     fn delete_remote_file(&self, target: &Path) -> io::Result<()> {
-       self.connect_and_run_command(
-           Command{
-               command: vec![
-                   "cmd".to_string(),
-                   "/c".to_string(),
-                   "del".to_string(),
-                   "/F".to_string(),
-                   "/Q".to_string(),
-                   target.to_string_lossy().to_string(),
-               ],
-               report_store_directory: None,
-               report_filename_prefix: "",
-               elevated: false
-           },
-           None
-       )
+        self.connect_and_run_command(
+            Command {
+                command: vec![
+                    "cmd".to_string(),
+                    "/c".to_string(),
+                    "del".to_string(),
+                    "/F".to_string(),
+                    "/Q".to_string(),
+                    target.to_string_lossy().to_string(),
+                ],
+                report_store_directory: None,
+                report_filename_prefix: "",
+                elevated: false,
+            },
+            None,
+        )
     }
 
     fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
-        self.copier_impl.copy_from_remote(source, target)
+        copy_from_remote_wildcards(
+            source,
+            target,
+            self,
+            |s, t| self.copier_impl.copy_from_remote(s, t),
+        )
     }
 }

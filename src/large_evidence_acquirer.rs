@@ -63,8 +63,8 @@ impl<'a> LargeEvidenceAcquirer<'a> {
         }
         thread::sleep(Duration::from_millis(10_000));
 
-        let _compression_split_copier = CompressCopier::new(self.connector, true, self.compress_timeout.clone());
-        let _compression_copier = CompressCopier::new(self.connector, false, self.compress_timeout.clone());
+        let _compression_split_copier = CompressCopier::new(self.connector, true, self.compress_timeout.clone(), true);
+        let _compression_copier = CompressCopier::new(self.connector, false, self.compress_timeout.clone(), true);
         let copier = match self.compression {
             Compression::No => self.connector.copier(),
             Compression::Yes => &_compression_copier as &dyn RemoteFileCopier,

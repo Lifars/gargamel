@@ -35,12 +35,8 @@ impl Connector for Local {
         self as &dyn RemoteFileCopier
     }
 
-    fn prepare_command(&self,
-                       command: Vec<String>,
-                       _output_file_path: Option<String>,
-                       _elevated: bool,
-    ) -> Vec<String> {
-        command
+    fn remote_temp_storage(&self) -> &Path {
+        Path::new("C:\\Users\\Public")
     }
 
     fn connect_and_run_local_program(
@@ -51,8 +47,12 @@ impl Connector for Local {
         self.connect_and_run_command(command_to_run, timeout)
     }
 
-    fn remote_temp_storage(&self) -> &Path {
-        Path::new("C:\\Users\\Public")
+    fn prepare_command(&self,
+                       command: Vec<String>,
+                       _output_file_path: Option<String>,
+                       _elevated: bool,
+    ) -> Vec<String> {
+        command
     }
 }
 

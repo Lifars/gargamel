@@ -1,4 +1,4 @@
-use crate::remote::RemoteFileCopier;
+use crate::remote::{RemoteFileCopier};
 use std::path::Path;
 use std::io;
 use std::fs::File;
@@ -20,15 +20,10 @@ pub fn download_files(file_list: &Path,
             continue;
         }
         let path_to_download = Path::new(&path_to_find);
-
-        // let file_name_to_download = match path_to_download.file_name() {
-        //     None => "root".to_string(),
-        //     Some(filename) => filename.to_string_lossy().to_string(),
-        // };
+        trace!("Establishing download of {} using {}", path_to_download.display(), downloader.method_name());
         let download_result = downloader.copy_from_remote(
             path_to_download,
             &local_store_directory,
-            // &local_store_directory.join(file_name_to_download),
         );
         match download_result {
             Ok(_) => { debug!("Remote file {} found and downloaded", path_to_find) }

@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier};
+use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, copy_from_remote_wildcards};
 use std::path::{Path, PathBuf};
 use std::io;
 use crate::process_runner::{run_process_blocking_maybe_timed, run_process_blocking_timed};
@@ -33,10 +33,6 @@ impl Connector for Wmi {
     ) -> Vec<String> {
         let remote_computer = self.remote_computer();
         let program_name = "powershell.exe".to_string();
-        // let wmi_implant = std::env::current_dir()
-        //     .expect("Cannot get current working directory")
-        //     .join("WMImplant.ps1")
-        //     .to_string_lossy().to_string();
         let command_joined: String = command.join(" ");
         let mut prepared_command = vec![
             program_name,
@@ -174,6 +170,11 @@ impl RemoteFileCopier for Wmi {
     }
 
     fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
-        self.copy_impl(source, target, "-Download", false)
+        copy_from_remote_wildcards(
+            source,
+            target,
+            self,
+            |s, t| self.copy_impl(s, t, "-Download", false),
+        )
     }
 }

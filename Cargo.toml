@@ -9,24 +9,15 @@ edition = "2018"
 opt-level = 'z'  # Optimize for size. Comment it to optimize for speed
 lto = true
 
-
-#[target.x86_64-pc-windows-gnu]
-#linker = "C:\\Users\\viliam\\scoop\\apps\\msys2\\current\\mingw64\\bin\\gcc.exe"
-#ar = "C:\\Users\\viliam\\scoop\\apps\\msys2\\current\\mingw64\\bin\\ar.exe"
-
-#[build]
-#rustflags = "-C target-cpu=native"
-
 [dependencies]
-#tokio = { version = "0.2", features=["full"] }
-#futures = "0.3"
-#async-trait = "0.1"
 log = "0.4"
 simplelog = "0.7"
 clap = { git = "https://github.com/clap-rs/clap/" }
 bytes = ""
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "0.8.2", features = ["v4"] }
 dunce = "1.0.0"
 wait-timeout = "0.2.0"
 rpassword = "4.0.5"
 fs_extra = "1.1"
+rayon = "1.5"
+wildmatch = "2.0.0"

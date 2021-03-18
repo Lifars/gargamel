@@ -13,7 +13,7 @@ pub struct EvidenceAcquirer<'a> {
 }
 
 impl<'a> EvidenceAcquirer<'a> {
-    fn new_standard_acquirer(
+    pub fn new(
         store_directory: &'a Path,
         remote_connector: Box<dyn Connector>,
     ) -> EvidenceAcquirer<'a> {
@@ -50,7 +50,7 @@ impl<'a> EvidenceAcquirer<'a> {
         store_directory: &'a Path,
         remote_temp_storage: PathBuf
     ) -> EvidenceAcquirer<'a> {
-        EvidenceAcquirer::new_standard_acquirer(
+        EvidenceAcquirer::new(
             store_directory,
             Box::new(PsExec::paexec(remote_computer, remote_temp_storage)),
         )
@@ -61,27 +61,18 @@ impl<'a> EvidenceAcquirer<'a> {
         store_directory: &'a Path,
         remote_temp_storage: PathBuf
     ) -> EvidenceAcquirer<'a> {
-        EvidenceAcquirer::new_standard_acquirer(
+        EvidenceAcquirer::new(
             store_directory,
             Box::new(PsRemote::new(remote_computer, remote_temp_storage)),
         )
     }
-
-    // pub fn local(
-    //     store_directory: &'a Path,
-    // ) -> EvidenceAcquirer<'a> {
-    //     EvidenceAcquirer::new_standard_acquirer(
-    //         store_directory,
-    //         Box::new(Local::new()),
-    //     )
-    // }
 
     pub fn wmi(
         remote_computer: Computer,
         store_directory: &'a Path,
         remote_temp_storage: PathBuf
     ) -> EvidenceAcquirer<'a> {
-        EvidenceAcquirer::new_standard_acquirer(
+        EvidenceAcquirer::new(
             store_directory,
             Box::new(Wmi {
                 computer: remote_computer,
@@ -96,7 +87,7 @@ impl<'a> EvidenceAcquirer<'a> {
         nla: bool,
         remote_temp_storage: PathBuf
     ) -> EvidenceAcquirer<'a> {
-        EvidenceAcquirer::new_standard_acquirer(
+        EvidenceAcquirer::new(
             store_directory,
             Box::new(Rdp {
                 nla,

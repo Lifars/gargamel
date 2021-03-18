@@ -6,7 +6,7 @@ Gargamel
 Compile
 -------
 
-Assuming you have Rust 1.41+ installed.
+Compiled and tested with Rust 1.50+.
 Open terminal in the project directory and to compile a release build type
 
 ```bash
@@ -252,7 +252,7 @@ OPTIONS:
 
 Known issues
 ------------
-* WMI cannot write its output to file with symbol `_` in its path/name.
+* WMI cannot write its output to a file with symbol `_` in its path/name.
 
 Licensing and Copyright
 -----------------------
