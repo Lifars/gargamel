@@ -4,6 +4,8 @@ use std::{io, thread};
 use std::time::Duration;
 use std::io::{Error};
 use uuid::Uuid;
+use crate::remote::Compression::No;
+use crate::utils::path_join_to_string_ntfs;
 
 
 #[derive(Clone, Copy)]
@@ -34,17 +36,12 @@ impl<'a> Archiver<'a> {
     }
 
     pub fn compress(&self, path: &Path, split: bool) -> PathBuf {
-        let path_string_wildcarded = path.to_string_lossy().to_string();
-        let path_string_7z = PathBuf::from(
-            format!("{}__{}.7z",
-                    path_string_wildcarded
-                        .replace(
-                            "*",
-                            "x",
-                        ),
-                    Uuid::new_v4().to_string().replace("-", "")
-            )
+        let extracted_file_name = format!("{}_{}__{}.7z",
+                                          self.connector.computer().address.replace(".", "-"),
+                                          path_join_to_string_ntfs(path),
+                                          Uuid::new_v4().to_string().replace("-", "")
         );
+        let path_string_7z = self.connector.remote_temp_storage().join(extracted_file_name);
         let mut run_params = vec![
             "7za.exe".to_string(),
         ];
@@ -59,7 +56,7 @@ impl<'a> Archiver<'a> {
 
         run_params.push("a".to_string());
         run_params.push(path_string_7z.to_string_lossy().to_string());
-        run_params.push(path_string_wildcarded.clone());
+        run_params.push(path.to_string_lossy().to_string());
 
         if path.file_name().unwrap_or_default().to_string_lossy().contains("*") {
             run_params.push("-r".to_string())
@@ -78,7 +75,7 @@ impl<'a> Archiver<'a> {
             debug!("{}", err)
         }
         // if split {
-        //   already deleted by 7zip itself
+        // //  already deleted by 7zip itself
         // } else {
         //     if let Err(err) = self.connector.copier().delete_remote_file(&path_string_7z) {
         //         debug!("{}", err)
@@ -105,7 +102,7 @@ impl<'a> Archiver<'a> {
         self.connector.connect_and_run_local_program_in_current_directory(
             command,
             self.timeout.clone(),
-        )
+        ).map(|_| ())
     }
 }
 
@@ -262,7 +259,11 @@ impl<'a> RemoteFileCopier for CompressCopier<'a> {
 impl CompressCopier<'_> {
     fn copy_from_remote_impl(&self, source: &Path, target: &Path) -> Result<(), Error> {
         trace!("Copying {} from {} using compression", source.display(), &self.archiver.connector.computer().address);
-        let archived_source = self.archiver.compress(source, self.split);
+        let archived_source =
+            self.archiver.compress(
+                source,
+                self.split
+            );
 
         let wait_time_s = Duration::from_secs(10);
         let wait_time_l = Duration::from_secs(30);

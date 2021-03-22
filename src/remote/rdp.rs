@@ -8,7 +8,7 @@ use std::time::Duration;
 pub struct Rdp {
     pub computer: Computer,
     pub nla: bool,
-    pub remote_temp_storage: PathBuf
+    pub remote_temp_storage: PathBuf,
 }
 
 impl Connector for Rdp {
@@ -31,8 +31,8 @@ impl Connector for Rdp {
     fn connect_and_run_command(
         &self,
         remote_connection: Command<'_>,
-        timeout: Option<Duration>
-    ) -> io::Result<()> {
+        timeout: Option<Duration>,
+    ) -> io::Result<Option<PathBuf>> {
         debug!("Trying to run command {:?} on {}",
                remote_connection.command,
                &self.computer().address
@@ -45,7 +45,7 @@ impl Connector for Rdp {
                     store_directory,
                     &remote_connection.report_filename_prefix,
                     self.connect_method_name(),
-                    "txt"
+                    "txt",
                 );
                 Some(file_path.to_str().unwrap().to_string())
             }
@@ -53,24 +53,24 @@ impl Connector for Rdp {
 
         let processed_command = self.prepare_command(
             remote_connection.command,
-            output_file_path,
+            output_file_path.as_deref(),
             remote_connection.elevated,
         );
 
         let prepared_command = self.prepare_remote_process(processed_command);
         let result = run_process_blocking(
             "cmd.exe",
-            &prepared_command
+            &prepared_command,
         );
         if let Some(timeout) = timeout {
             std::thread::sleep(timeout);
         }
-        result
+        result.map(|_| output_file_path.map(|it| PathBuf::from(it)))
     }
 
     fn prepare_command(&self,
                        command: Vec<String>,
-                       output_file_path: Option<String>,
+                       output_file_path: Option<&str>,
                        elevated: bool,
     ) -> Vec<String> {
         let remote_computer = self.remote_computer();
@@ -119,9 +119,9 @@ impl Connector for Rdp {
                     .replacen(":", "", 1);
                 format!(
 //                     "command={} -p.i.p.e- Out-File -FilePath \\\\tsclient\\{}",
-                    "command=cmd.exe /c {} -p.i.p.e- Out-File -FilePath \\\\tsclient\\{}",
-                    command_joined,
-                    as_remote_path
+"command=cmd.exe /c {} -p.i.p.e- Out-File -FilePath \\\\tsclient\\{}",
+command_joined,
+as_remote_path
                 )
             }
         };

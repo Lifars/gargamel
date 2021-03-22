@@ -67,7 +67,7 @@ impl Connector for PsExec {
     fn connect_and_run_local_program(&self,
                                      command_to_run: Command<'_>,
                                      timeout: Option<Duration>,
-    ) -> Result<(), Error> {
+    ) -> Result<Option<PathBuf>, Error> {
         let mut command = command_to_run.command;
         if self.ms_psexec {
             command.insert(0, "-accepteula".to_string());
@@ -84,7 +84,7 @@ impl Connector for PsExec {
 
     fn prepare_command(&self,
                        command: Vec<String>,
-                       output_file_path: Option<String>,
+                       output_file_path: Option<&str>,
                        elevated: bool,
     ) -> Vec<String> {
         let remote_computer = self.computer();
@@ -108,7 +108,7 @@ impl Connector for PsExec {
             None => prepared_command,
             Some(output_file_path) => {
                 prepared_command.push(">".to_string());
-                prepared_command.push(output_file_path);
+                prepared_command.push(output_file_path.to_string());
                 prepared_command
             }
         }
@@ -148,7 +148,7 @@ impl RemoteFileCopier for PsExec {
                 elevated: false,
             },
             None,
-        )
+        ).map(|_| ())
     }
 
     fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {

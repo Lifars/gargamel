@@ -135,6 +135,12 @@ pub struct Opts {
     pub image_memory: bool,
 
     #[clap(
+    long = "edb",
+    help = "Optional: Acquire Windows search index file."
+    )]
+    pub acquire_edb: bool,
+
+    #[clap(
     long = "timeout",
     help = "Optional: Timeout in seconds for long running operations.\
     This option is a workaround for a bug in WMImplant.ps1 amd SharpRDP.exe where finishing of a long running operation cannot sometimes properly close the connection. This leaves the Gargamel in a seemingly frozen state or it may execute the next operation prematurely.\

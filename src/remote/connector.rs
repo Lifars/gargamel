@@ -1,7 +1,7 @@
 use std::io::{Result, BufReader, BufRead};
 use crate::process_runner::{run_process_blocking, create_report_path, run_process_blocking_timed};
 use std::{iter, thread, io};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use crate::arg_parser::Opts;
 use std::time::Duration;
 use crate::remote::{RemoteFileCopier, Local};
@@ -196,7 +196,7 @@ pub trait Connector {
         &self,
         command_to_run: Command<'_>,
         timeout: Option<Duration>,
-    ) -> Result<()> {
+    ) -> Result<Option<PathBuf>> {
         let mut command = command_to_run.command;
         command[0] = std::env::current_dir().unwrap()
             .join(Path::new(&command[0]).file_name().unwrap())
@@ -215,7 +215,7 @@ pub trait Connector {
         &self,
         command_to_run: Command<'_>,
         timeout: Option<Duration>,
-    ) -> Result<()> {
+    ) -> Result<Option<PathBuf>> {
         let local_program_path = Path::new(command_to_run.command.first().unwrap());
         let remote_storage = self.remote_temp_storage();
         let copier = self.copier();
@@ -232,16 +232,17 @@ pub trait Connector {
             command,
             ..command_to_run
         };
-        self.connect_and_run_command(command_to_run, timeout)?;
+        let result =self.connect_and_run_command(command_to_run, timeout)?;
         thread::sleep(Duration::from_millis(10_000));
-        copier.delete_remote_file(&remote_program_path)
+        copier.delete_remote_file(&remote_program_path)?;
+        Ok(result)
     }
 
     fn connect_and_run_command(
         &self,
         command_to_run: Command<'_>,
         timeout: Option<Duration>,
-    ) -> Result<()> {
+    ) -> Result<Option<PathBuf>> {
         debug!("Trying to run command {:?} on {}",
                command_to_run.command,
                &self.computer().address
@@ -262,7 +263,7 @@ pub trait Connector {
 
         let processed_command = self.prepare_command(
             command_to_run.command,
-            output_file_path,
+            output_file_path.as_deref(),
             command_to_run.elevated,
         );
 
@@ -279,7 +280,8 @@ pub trait Connector {
                     &prepared_command,
                     timeout.clone(),
                 ),
-        }
+        }?;
+        Ok(output_file_path.map(|it| PathBuf::from(it)))
     }
 
     fn prepare_remote_process(&self,
@@ -297,7 +299,7 @@ pub trait Connector {
 
     fn prepare_command(&self,
                        command: Vec<String>,
-                       output_file_path: Option<String>,
+                       output_file_path: Option<&str>,
                        elevated: bool,
     ) -> Vec<String>;
 

@@ -23,6 +23,7 @@ use std::time::Duration;
 use crate::events_acquirer::EventsAcquirer;
 use rayon::prelude::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
+use crate::Edb_acquirer::EdbAcquirer;
 
 mod process_runner;
 mod evidence_acquirer;
@@ -37,12 +38,13 @@ mod events_acquirer;
 mod file_acquirer;
 mod registry_acquirer;
 mod command_runner;
+mod Edb_acquirer;
 
 fn setup_logger() {
     CombinedLogger::init(
         vec![
-            TermLogger::new(LevelFilter::Info, Config::default(), TerminalMode::Mixed).unwrap(),
-            WriteLogger::new(LevelFilter::Info, Config::default(), File::create("gargamel.log").unwrap()),
+            TermLogger::new(LevelFilter::Trace, Config::default(), TerminalMode::Mixed).unwrap(),
+            WriteLogger::new(LevelFilter::Trace, Config::default(), File::create("gargamel.log").unwrap()),
         ]
     ).unwrap();
 }
@@ -192,10 +194,13 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
                     local_store_directory,
                     copier.as_ref(),
                 );
-                if result.is_ok() {
-                    info!("Files in {} successfully transferred.", search_files_path.display());
-                    break;
-                }
+                match result {
+                    Err(err) => error!("{}", err),
+                    Ok(_) => {
+                        info!("Files in {} successfully transferred.", search_files_path.display());
+                        break;
+                    }
+                };
             }
         }
     }
@@ -210,9 +215,27 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
         for acquirer in memory_acquirers {
             info!("Running memory acquirer using method {}", acquirer.connector.connect_method_name());
             let image_res = acquirer.image_memory();
-            if image_res.is_ok() {
-                break;
-            }
+            match image_res {
+                Err(err) => error!("{}", err),
+                Ok(_) => break
+            };
+        }
+    }
+    if opts.acquire_edb {
+        let edb_acquirers = create_edb_acquirers(
+            &remote_computer,
+            local_store_directory,
+            &opts,
+            remote_temp_storage,
+            local
+        );
+        for acquirer in edb_acquirers {
+            info!("Running edb acquirer using method {}", acquirer.connector.connect_method_name());
+            let edb_res = acquirer.download_edb();
+            match edb_res {
+                Err(err) => error!("{}", err),
+                Ok(_) => break
+            };
         }
     }
 
@@ -399,6 +422,111 @@ fn create_memory_acquirers<'a>(
         if opts.wmi {
             acquirers.push(
                 MemoryAcquirer::wmi(
+                    computer.clone(),
+                    local_store_directory,
+                    Duration::from_secs(opts.timeout),
+                    Duration::from_secs(opts.timeout),
+                    opts.no_compression,
+                    remote_temp_storage.to_path_buf(),
+                )
+            );
+        }
+        acquirers
+    };
+    acquirers
+}
+
+fn create_edb_acquirers<'a>(
+    computer: &'a Computer,
+    local_store_directory: &'a Path,
+    opts: &Opts,
+    remote_temp_storage: &Path,
+    local: bool,
+) -> Vec<EdbAcquirer<'a>> {
+    if local {
+        return vec![EdbAcquirer::local(local_store_directory)];
+    }
+
+    let acquirers: Vec<EdbAcquirer<'a>> = if opts.all {
+        vec![
+            EdbAcquirer::psexec64(
+                computer.clone(),
+                local_store_directory,
+                opts.no_compression,
+                remote_temp_storage.to_path_buf(),
+            ),
+            EdbAcquirer::psremote(
+                computer.clone(),
+                local_store_directory,
+                opts.no_compression,
+                remote_temp_storage.to_path_buf(),
+            ),
+            EdbAcquirer::rdp(
+                computer.clone(),
+                local_store_directory,
+                opts.nla,
+                Duration::from_secs(opts.timeout),
+                Duration::from_secs(opts.timeout),
+                opts.no_compression,
+                remote_temp_storage.to_path_buf(),
+            ),
+            EdbAcquirer::wmi(
+                computer.clone(),
+                local_store_directory,
+                Duration::from_secs(opts.timeout),
+                Duration::from_secs(opts.timeout),
+                opts.no_compression,
+                remote_temp_storage.to_path_buf(),
+            ),
+        ]
+    } else {
+        let mut acquirers = Vec::<EdbAcquirer>::new();
+        if opts.psexec32 {
+            acquirers.push(
+                EdbAcquirer::psexec32(
+                    computer.clone(),
+                    local_store_directory,
+                    opts.no_compression,
+                    remote_temp_storage.to_path_buf(),
+                )
+            );
+        }
+        if opts.psexec64 {
+            acquirers.push(
+                EdbAcquirer::psexec64(
+                    computer.clone(),
+                    local_store_directory,
+                    opts.no_compression,
+                    remote_temp_storage.to_path_buf(),
+                )
+            );
+        }
+        if opts.psrem {
+            acquirers.push(
+                EdbAcquirer::psremote(
+                    computer.clone(),
+                    local_store_directory,
+                    opts.no_compression,
+                    remote_temp_storage.to_path_buf(),
+                )
+            );
+        }
+        if opts.rdp {
+            acquirers.push(
+                EdbAcquirer::rdp(
+                    computer.clone(),
+                    local_store_directory,
+                    opts.nla,
+                    Duration::from_secs(opts.timeout),
+                    Duration::from_secs(opts.timeout),
+                    opts.no_compression,
+                    remote_temp_storage.to_path_buf(),
+                )
+            );
+        }
+        if opts.wmi {
+            acquirers.push(
+                EdbAcquirer::wmi(
                     computer.clone(),
                     local_store_directory,
                     Duration::from_secs(opts.timeout),

@@ -38,7 +38,7 @@ impl Connector for PsRemote {
 
     fn prepare_command(&self,
                        command: Vec<String>,
-                       output_file_path: Option<String>,
+                       output_file_path: Option<&str>,
                        _elevated: bool,
     ) -> Vec<String> {
         let remote_computer = self.computer();
@@ -70,7 +70,7 @@ impl Connector for PsRemote {
             None => prepared_command,
             Some(output_file_path) => {
                 prepared_command.push(">".to_string());
-                prepared_command.push(output_file_path);
+                prepared_command.push(output_file_path.to_string());
                 prepared_command
             }
         }

@@ -43,13 +43,13 @@ impl Connector for Local {
         &self,
         command_to_run: Command<'_>,
         timeout: Option<Duration>
-    ) -> io::Result<()> {
+    ) -> io::Result<Option<PathBuf>> {
         self.connect_and_run_command(command_to_run, timeout)
     }
 
     fn prepare_command(&self,
                        command: Vec<String>,
-                       output_file_path: Option<String>,
+                       output_file_path: Option<&str>,
                        _elevated: bool,
     ) -> Vec<String> {
         match output_file_path {
@@ -57,7 +57,7 @@ impl Connector for Local {
             Some(output_file_path) => {
                 let mut result : Vec<String> = command.into();
                 result.push(">".to_string());
-                result.push(output_file_path);
+                result.push(output_file_path.to_string());
                 result
             }
         }
