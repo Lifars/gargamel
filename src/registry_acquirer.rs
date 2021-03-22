@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Connector, PsExec, PsRemote, Rdp, Wmi, Compression};
+use crate::remote::{Computer, Connector, PsExec, PsRemote, Rdp, Wmi, Compression, Local};
 use std::time::Duration;
 use crate::large_evidence_acquirer::LargeEvidenceAcquirer;
 
@@ -68,6 +68,16 @@ impl<'a> RegistryAcquirer<'a> {
             Box::new(PsExec::psexec32(computer, remote_temp_storage)),
             None,
             if no_7zip { Compression::No } else { Compression::Yes },
+        )
+    }
+
+    pub fn local(
+        store_directory: &'a Path) -> RegistryAcquirer {
+        RegistryAcquirer::new(
+            store_directory,
+            Box::new(Local::new()),
+            None,
+            Compression::No,
         )
     }
 

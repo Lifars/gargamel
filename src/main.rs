@@ -14,7 +14,7 @@ extern crate simplelog;
 use clap::derive::Clap;
 use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Rdp, Wmi, Ssh, RemoteFileCopier, ReDownloader, PsExec, PsRemote, CompressCopierOwned};
+use crate::remote::{Computer, Rdp, Wmi, Ssh, RemoteFileCopier, ReDownloader, PsExec, PsRemote, CompressCopierOwned, Local};
 use crate::memory_acquirer::MemoryAcquirer;
 use crate::command_runner::CommandRunner;
 use crate::file_acquirer::download_files;
@@ -56,7 +56,7 @@ fn main() -> Result<(), io::Error> {
     debug!("Parsing remote computers.");
     let remote_computers: Vec<Computer> = opts.clone().into();
     trace!("Will connect to {} computers", remote_computers.len());
-    let opts =  Opts {
+    let opts = Opts {
         password: remote_computers[0].password.clone(),
         domain: remote_computers[0].domain.clone(),
         user: Some(remote_computers[0].username.clone()),
@@ -67,11 +67,11 @@ fn main() -> Result<(), io::Error> {
     if opts.par {
         remote_computers.par_iter()
             .map(|remote_computer| handle_remote_computer(&opts, &remote_computer))
-            .for_each(|result| if result.is_err() { error!("{}", result.expect_err("")) } )
+            .for_each(|result| if result.is_err() { error!("{}", result.expect_err("")) })
     } else {
         remote_computers.iter()
             .map(|remote_computer| handle_remote_computer(&opts, &remote_computer))
-            .for_each(|result| if result.is_err() { error!("{}", result.expect_err("")) } )
+            .for_each(|result| if result.is_err() { error!("{}", result.expect_err("")) })
     }
     Ok(())
 }
@@ -82,6 +82,7 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
     let local_store_directory = local_store_directory_owned.as_path();
     let remote_temp_storage = Path::new(&opts.remote_store_directory);
     let key_file = opts.ssh_key.clone().map(|it| PathBuf::from(it));
+    let local = opts.computer == "127.0.0.1" || opts.computer == "localhost";
 
     if let Some(remote_file) = &opts.re_download {
         let copiers = create_copiers(
@@ -91,7 +92,8 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
             true,
             false,
             false,
-            None
+            None,
+            local
         );
         let remote_file = Path::new(&remote_file);
         for copier in copiers {
@@ -111,6 +113,7 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
             &opts,
             key_file.as_ref().map(|it| it.to_path_buf()),
             remote_temp_storage,
+            local
         );
         for acquirer in evidence_acquirers {
             acquirer.run_all();
@@ -123,6 +126,7 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
             local_store_directory,
             &opts,
             remote_temp_storage,
+            local
         );
         for acquirer in event_acquirers {
             acquirer.acquire();
@@ -136,6 +140,7 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
             &opts,
             key_file.as_ref().map(|it| it.to_path_buf()),
             remote_temp_storage,
+            local
         );
         for command_runner in command_runners {
             info!("Running commands using method {}", command_runner.connector.connect_method_name());
@@ -151,6 +156,7 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
             local_store_directory,
             &opts,
             remote_temp_storage,
+            local
         );
         for acquirer in registry_acquirers {
             acquirer.acquire();
@@ -176,7 +182,8 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
                 true,
                 !opts.no_compression,
                 false,
-                Some(Duration::from_secs(opts.timeout))
+                Some(Duration::from_secs(opts.timeout)),
+                local
             );
             for copier in copiers.into_iter() {
                 info!("Downloading specified files using {}", copier.copier_impl().method_name());
@@ -198,6 +205,7 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
             local_store_directory,
             &opts,
             remote_temp_storage,
+            local
         );
         for acquirer in memory_acquirers {
             info!("Running memory acquirer using method {}", acquirer.connector.connect_method_name());
@@ -217,7 +225,12 @@ fn create_evidence_acquirers<'a>(
     opts: &Opts,
     key_file: Option<PathBuf>,
     remote_temp_storage: &Path,
+    local: bool,
 ) -> Vec<EvidenceAcquirer<'a>> {
+    if local {
+        return vec![EvidenceAcquirer::local(local_store_directory)];
+    }
+
     let acquirers: Vec<EvidenceAcquirer<'a>> = if opts.all {
         vec![
             EvidenceAcquirer::psexec(
@@ -300,7 +313,12 @@ fn create_memory_acquirers<'a>(
     local_store_directory: &'a Path,
     opts: &Opts,
     remote_temp_storage: &Path,
+    local: bool,
 ) -> Vec<MemoryAcquirer<'a>> {
+    if local {
+        return vec![MemoryAcquirer::local(local_store_directory)];
+    }
+
     let acquirers: Vec<MemoryAcquirer<'a>> = if opts.all {
         vec![
             MemoryAcquirer::psexec64(
@@ -401,7 +419,15 @@ fn create_command_runners<'a>(
     opts: &Opts,
     key_file: Option<PathBuf>,
     remote_temp_storage: &Path,
+    local: bool,
 ) -> Vec<CommandRunner<'a>> {
+
+    if local {
+        return vec![CommandRunner::local(
+            local_store_directory,
+        )]
+    }
+
     let acquirers: Vec<CommandRunner<'a>> = if opts.all {
         vec![
             CommandRunner::psexec(
@@ -484,7 +510,17 @@ fn create_registry_acquirers<'a>(
     local_store_directory: &'a Path,
     opts: &Opts,
     remote_temp_storage: &Path,
+    local: bool
 ) -> Vec<RegistryAcquirer<'a>> {
+
+    if local {
+        return vec![
+            RegistryAcquirer::local(
+                local_store_directory,
+            )
+        ]
+    }
+
     let acquirers: Vec<RegistryAcquirer<'a>> = if opts.all {
         vec![
             RegistryAcquirer::psexec64(
@@ -580,7 +616,13 @@ fn create_events_acquirers<'a>(
     local_store_directory: &'a Path,
     opts: &Opts,
     remote_temp_storage: &Path,
+    local: bool
 ) -> Vec<EventsAcquirer<'a>> {
+
+    if local {
+        return vec![EventsAcquirer::local(local_store_directory)];
+    }
+
     let acquirers: Vec<EventsAcquirer<'a>> = if opts.all {
         vec![
             EventsAcquirer::psexec64(
@@ -679,8 +721,14 @@ fn create_copiers(
     allowed_ssh: bool,
     compression: bool,
     uncompress_downloaded: bool,
-    compress_timeout: Option<Duration>
+    compress_timeout: Option<Duration>,
+    local: bool
 ) -> Vec<Box<dyn RemoteFileCopier>> {
+
+    if local {
+        return vec![Box::new(Local::new())]
+    }
+
     let mut copiers = Vec::<Box<dyn RemoteFileCopier>>::new();
     if opts.psexec32 {
         trace!("Creating psexec32 copier");

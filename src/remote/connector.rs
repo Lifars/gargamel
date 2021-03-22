@@ -4,7 +4,7 @@ use std::{iter, thread, io};
 use std::path::Path;
 use crate::arg_parser::Opts;
 use std::time::Duration;
-use crate::remote::RemoteFileCopier;
+use crate::remote::{RemoteFileCopier, Local};
 use std::fs::File;
 use uuid::Uuid;
 use rpassword::read_password;
@@ -37,6 +37,10 @@ pub struct Command<'a> {
 
 impl From<Opts> for Computer {
     fn from(opts: Opts) -> Self {
+        if opts.computer == "127.0.0.1" || opts.computer == "localhost" {
+            return Local::new().computer().clone();
+        }
+
         let (domain, username) = match &opts.user {
             Some(user) => if user.is_empty() {
                 (None, "".to_string())

@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression, Local};
 use std::path::{Path, PathBuf};
 use std::{io, thread};
 use std::time::Duration;
@@ -26,6 +26,18 @@ impl<'a> MemoryAcquirer<'a> {
             image_timeout: None,
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },
+        }
+    }
+
+    pub fn local(
+        local_store_directory: &'a Path,
+    ) -> MemoryAcquirer<'a> {
+        MemoryAcquirer {
+            local_store_directory,
+            connector: Box::new(Local::new()),
+            image_timeout: None,
+            compress_timeout: None,
+            compression: Compression::No,
         }
     }
 

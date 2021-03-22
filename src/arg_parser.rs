@@ -165,7 +165,7 @@ pub struct Opts {
 
     #[clap(
     long = "in-parallel",
-    help = "Optional: Enable parallelism when connecting to more remote computers.",
+    help = "Optional: Experimental. Enable parallelism when connecting to more remote computers.",
     )]
     pub par: bool
 }

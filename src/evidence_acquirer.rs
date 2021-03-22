@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Ssh, Rdp, Wmi};
+use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Ssh, Rdp, Wmi, Local};
 
 pub struct EvidenceAcquirer<'a> {
     store_directory: &'a Path,
@@ -43,6 +43,15 @@ impl<'a> EvidenceAcquirer<'a> {
                 "-ano".to_string(),
             ]),
         }
+    }
+
+    pub fn local(
+        store_directory: &'a Path,
+    ) -> EvidenceAcquirer<'a> {
+        EvidenceAcquirer::new(
+            store_directory,
+            Box::new(Local::new()),
+        )
     }
 
     pub fn psexec(
