@@ -37,12 +37,12 @@ impl<'a> Archiver<'a> {
         let path_string_wildcarded = path.to_string_lossy().to_string();
         let path_string_7z = PathBuf::from(
             format!("{}__{}.7z",
-                Uuid::new_v4().to_string().replace("-", ""),
                     path_string_wildcarded
                         .replace(
                             "*",
                             "x",
-                        )
+                        ),
+                    Uuid::new_v4().to_string().replace("-", "")
             )
         );
         let mut run_params = vec![
