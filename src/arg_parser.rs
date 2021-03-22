@@ -107,7 +107,13 @@ pub struct Opts {
     long = "psexec",
     help = "Acquire evidence from a remote Windows machine using PsExec. Requires both PsExec64.exe and paexec.exe in the current directory or in the path."
     )]
-    pub psexec: bool,
+    pub psexec64: bool,
+
+    #[clap(
+    long = "psexec32",
+    help = "Acquire evidence from a remote Windows machine using 32 bit PsExec. Requires both PsExec.exe and paexec.exe in the current directory or in the path."
+    )]
+    pub psexec32: bool,
 
     #[clap(
     long = "psrem",

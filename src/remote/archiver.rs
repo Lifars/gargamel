@@ -35,7 +35,16 @@ impl<'a> Archiver<'a> {
 
     pub fn compress(&self, path: &Path, split: bool) -> PathBuf {
         let path_string_wildcarded = path.to_string_lossy().to_string();
-        let path_string_7z = PathBuf::from(format!("{}.7z", path_string_wildcarded.replace("*", &Uuid::new_v4().to_string())));
+        let path_string_7z = PathBuf::from(
+            format!("{}__{}.7z",
+                Uuid::new_v4().to_string().replace("-", ""),
+                    path_string_wildcarded
+                        .replace(
+                            "*",
+                            "x",
+                        )
+            )
+        );
         let mut run_params = vec![
             "7za.exe".to_string(),
         ];
@@ -69,13 +78,13 @@ impl<'a> Archiver<'a> {
             debug!("{}", err)
         }
         // if split {
-         //   already deleted by 7zip itself
+        //   already deleted by 7zip itself
         // } else {
         //     if let Err(err) = self.connector.copier().delete_remote_file(&path_string_7z) {
         //         debug!("{}", err)
         //     }
         // }
-       path_string_7z
+        path_string_7z
     }
 
     pub fn uncompress(&self, path: &Path) -> io::Result<()> {
@@ -121,12 +130,12 @@ impl ArchiverOwned {
     }
 
     pub fn compress(&self, path: &Path, split: bool) -> PathBuf {
-        Archiver{ connector: self.connector.as_ref(), timeout: self.timeout.clone() }
+        Archiver { connector: self.connector.as_ref(), timeout: self.timeout.clone() }
             .compress(path, split)
     }
 
     pub fn uncompress(&self, path: &Path) -> io::Result<()> {
-        Archiver{ connector: self.connector.as_ref(), timeout: self.timeout.clone() }
+        Archiver { connector: self.connector.as_ref(), timeout: self.timeout.clone() }
             .uncompress(path)
     }
 }
@@ -251,10 +260,9 @@ impl<'a> RemoteFileCopier for CompressCopier<'a> {
 
 
 impl CompressCopier<'_> {
-
     fn copy_from_remote_impl(&self, source: &Path, target: &Path) -> Result<(), Error> {
         trace!("Copying {} from {} using compression", source.display(), &self.archiver.connector.computer().address);
-        let archived_source =self.archiver.compress(source, self.split);
+        let archived_source = self.archiver.compress(source, self.split);
 
         let wait_time_s = Duration::from_secs(10);
         let wait_time_l = Duration::from_secs(30);

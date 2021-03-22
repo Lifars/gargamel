@@ -13,7 +13,8 @@ pub struct MemoryAcquirer<'a> {
 }
 
 impl<'a> MemoryAcquirer<'a> {
-    pub fn psexec(
+
+    pub fn psexec32(
         remote_computer: Computer,
         local_store_directory: &'a Path,
         no_7zip: bool,
@@ -21,7 +22,22 @@ impl<'a> MemoryAcquirer<'a> {
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
-            connector: Box::new(PsExec::psexec(remote_computer, remote_temp_storage)),
+            connector: Box::new(PsExec::psexec32(remote_computer, remote_temp_storage)),
+            image_timeout: None,
+            compress_timeout: None,
+            compression: if no_7zip { Compression::No } else { Compression::Yes },
+        }
+    }
+
+    pub fn psexec64(
+        remote_computer: Computer,
+        local_store_directory: &'a Path,
+        no_7zip: bool,
+        remote_temp_storage: PathBuf
+    ) -> MemoryAcquirer<'a> {
+        MemoryAcquirer {
+            local_store_directory,
+            connector: Box::new(PsExec::psexec64(remote_computer, remote_temp_storage)),
             image_timeout: None,
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },

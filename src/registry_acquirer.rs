@@ -57,7 +57,7 @@ impl<'a> RegistryAcquirer<'a> {
         }
     }
 
-    pub fn psexec(
+    pub fn psexec32(
         store_directory: &'a Path,
         computer: Computer,
         no_7zip: bool,
@@ -65,7 +65,21 @@ impl<'a> RegistryAcquirer<'a> {
     ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(PsExec::psexec(computer, remote_temp_storage)),
+            Box::new(PsExec::psexec32(computer, remote_temp_storage)),
+            None,
+            if no_7zip { Compression::No } else { Compression::Yes },
+        )
+    }
+
+    pub fn psexec64(
+        store_directory: &'a Path,
+        computer: Computer,
+        no_7zip: bool,
+        remote_temp_storage: PathBuf
+    ) -> RegistryAcquirer {
+        RegistryAcquirer::new(
+            store_directory,
+            Box::new(PsExec::psexec64(computer, remote_temp_storage)),
             None,
             if no_7zip { Compression::No } else { Compression::Yes },
         )

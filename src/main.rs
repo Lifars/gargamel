@@ -244,7 +244,7 @@ fn create_evidence_acquirers<'a>(
         ]
     } else {
         let mut acquirers = Vec::<EvidenceAcquirer<'a>>::new();
-        if opts.psexec {
+        if opts.psexec64 || opts.psexec32 {
             acquirers.push(
                 EvidenceAcquirer::psexec(
                     computer.clone(),
@@ -303,7 +303,7 @@ fn create_memory_acquirers<'a>(
 ) -> Vec<MemoryAcquirer<'a>> {
     let acquirers: Vec<MemoryAcquirer<'a>> = if opts.all {
         vec![
-            MemoryAcquirer::psexec(
+            MemoryAcquirer::psexec64(
                 computer.clone(),
                 local_store_directory,
                 opts.no_compression,
@@ -335,9 +335,19 @@ fn create_memory_acquirers<'a>(
         ]
     } else {
         let mut acquirers = Vec::<MemoryAcquirer>::new();
-        if opts.psexec {
+        if opts.psexec32 {
             acquirers.push(
-                MemoryAcquirer::psexec(
+                MemoryAcquirer::psexec32(
+                    computer.clone(),
+                    local_store_directory,
+                    opts.no_compression,
+                    remote_temp_storage.to_path_buf(),
+                )
+            );
+        }
+        if opts.psexec64 {
+            acquirers.push(
+                MemoryAcquirer::psexec64(
                     computer.clone(),
                     local_store_directory,
                     opts.no_compression,
@@ -418,7 +428,7 @@ fn create_command_runners<'a>(
         ]
     } else {
         let mut acquirers = Vec::<CommandRunner>::new();
-        if opts.psexec {
+        if opts.psexec64 || opts.psexec32 {
             acquirers.push(
                 CommandRunner::psexec(
                     computer.clone(),
@@ -477,7 +487,7 @@ fn create_registry_acquirers<'a>(
 ) -> Vec<RegistryAcquirer<'a>> {
     let acquirers: Vec<RegistryAcquirer<'a>> = if opts.all {
         vec![
-            RegistryAcquirer::psexec(
+            RegistryAcquirer::psexec64(
                 local_store_directory,
                 computer.clone(),
                 opts.no_compression,
@@ -507,9 +517,19 @@ fn create_registry_acquirers<'a>(
         ]
     } else {
         let mut acquirers = Vec::<RegistryAcquirer<'a>>::new();
-        if opts.psexec {
+        if opts.psexec32 {
             acquirers.push(
-                RegistryAcquirer::psexec(
+                RegistryAcquirer::psexec32(
+                    local_store_directory,
+                    computer.clone(),
+                    opts.no_compression,
+                    remote_temp_storage.to_path_buf(),
+                ),
+            );
+        }
+        if opts.psexec64 {
+            acquirers.push(
+                RegistryAcquirer::psexec64(
                     local_store_directory,
                     computer.clone(),
                     opts.no_compression,
@@ -563,7 +583,7 @@ fn create_events_acquirers<'a>(
 ) -> Vec<EventsAcquirer<'a>> {
     let acquirers: Vec<EventsAcquirer<'a>> = if opts.all {
         vec![
-            EventsAcquirer::psexec(
+            EventsAcquirer::psexec64(
                 local_store_directory,
                 computer.clone(),
                 opts.no_compression,
@@ -593,9 +613,19 @@ fn create_events_acquirers<'a>(
         ]
     } else {
         let mut acquirers = Vec::<EventsAcquirer<'a>>::new();
-        if opts.psexec {
+        if opts.psexec32 {
             acquirers.push(
-                EventsAcquirer::psexec(
+                EventsAcquirer::psexec32(
+                    local_store_directory,
+                    computer.clone(),
+                    opts.no_compression,
+                    remote_temp_storage.to_path_buf(),
+                ),
+            );
+        }
+        if opts.psexec64 {
+            acquirers.push(
+                EventsAcquirer::psexec64(
                     local_store_directory,
                     computer.clone(),
                     opts.no_compression,
@@ -652,9 +682,21 @@ fn create_copiers(
     compress_timeout: Option<Duration>
 ) -> Vec<Box<dyn RemoteFileCopier>> {
     let mut copiers = Vec::<Box<dyn RemoteFileCopier>>::new();
-    if opts.psexec || opts.all {
-        trace!("Creating psexec copier");
-        let copier = Box::new(PsExec::psexec(computer.clone(), remote_temp_storage.to_path_buf()));
+    if opts.psexec32 {
+        trace!("Creating psexec32 copier");
+        let copier = Box::new(PsExec::psexec32(computer.clone(), remote_temp_storage.to_path_buf()));
+        copiers.push(
+            if compression {
+                trace!("Enabling compression for psexec");
+                Box::new(CompressCopierOwned::new(copier, false, None, uncompress_downloaded))
+            } else {
+                copier
+            }
+        );
+    }
+    if opts.psexec64 || opts.all {
+        trace!("Creating psexec64 copier");
+        let copier = Box::new(PsExec::psexec64(computer.clone(), remote_temp_storage.to_path_buf()));
         copiers.push(
             if compression {
                 trace!("Enabling compression for psexec");

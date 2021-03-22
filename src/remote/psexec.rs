@@ -12,6 +12,9 @@ pub struct PsExec {
     ms_psexec: bool,
 }
 
+pub const PSEXEC64_NAME: &str = "PsExec64.exe";
+pub const PSEXEC32_NAME: &str = "PsExec.exe";
+
 impl PsExec {
     pub fn paexec(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
         PsExec {
@@ -23,11 +26,21 @@ impl PsExec {
         }
     }
 
-    pub fn psexec(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
+    pub fn psexec32(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
         PsExec {
             computer: computer.clone(),
             copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
-            psexec_name: "PsExec64.exe".to_string(),
+            psexec_name: PSEXEC32_NAME.to_string(),
+            remote_temp_storage,
+            ms_psexec: true,
+        }
+    }
+
+    pub fn psexec64(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
+        PsExec {
+            computer: computer.clone(),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            psexec_name: PSEXEC64_NAME.to_string(),
             remote_temp_storage,
             ms_psexec: true,
         }
