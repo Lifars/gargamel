@@ -49,10 +49,18 @@ impl Connector for Local {
 
     fn prepare_command(&self,
                        command: Vec<String>,
-                       _output_file_path: Option<String>,
+                       output_file_path: Option<String>,
                        _elevated: bool,
     ) -> Vec<String> {
-        command
+        match output_file_path {
+            None => command,
+            Some(output_file_path) => {
+                let mut result : Vec<String> = command.into();
+                result.push(">".to_string());
+                result.push(output_file_path);
+                result
+            }
+        }
     }
 }
 
