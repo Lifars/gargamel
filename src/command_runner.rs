@@ -14,11 +14,12 @@ impl<'a> CommandRunner<'a> {
     pub fn psexec(
         remote_computer: Computer,
         local_store_directory: &'a Path,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>
     ) -> CommandRunner<'a> {
         CommandRunner {
             local_store_directory,
-            connector: Box::new(PsExec::paexec(remote_computer, remote_temp_storage)),
+            connector: Box::new(PsExec::paexec(remote_computer, remote_temp_storage, custom_share_folder)),
             run_implicit: true,
         }
     }
@@ -48,11 +49,12 @@ impl<'a> CommandRunner<'a> {
     pub fn psremote(
         remote_computer: Computer,
         local_store_directory: &'a Path,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>
     ) -> CommandRunner<'a> {
         CommandRunner {
             local_store_directory,
-            connector: Box::new(PsRemote::new(remote_computer, remote_temp_storage)),
+            connector: Box::new(PsRemote::new(remote_computer, remote_temp_storage, custom_share_folder)),
             run_implicit: true,
         }
     }

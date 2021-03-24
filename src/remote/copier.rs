@@ -129,7 +129,8 @@ pub fn copy_from_remote_wildcards<F>(
             .iter()
             .filter(|path_item| {
                 trace!("Matching {} with {}", &wildcarded, path_item);
-                WildMatch::new(&wildcarded).matches(path_item) }
+                WildMatch::new(&wildcarded).matches(path_item)
+            }
             )
             .for_each(|item| {
                 let src = dir.join(item).join(&rem);
@@ -145,6 +146,7 @@ pub fn copy_from_remote_wildcards<F>(
 pub struct WindowsRemoteFileHandler {
     computer: Computer,
     copier_impl: Box<dyn FileCopier>,
+    pub custom_share_folder: Option<String>,
 }
 
 impl Drop for WindowsRemoteFileHandler {
@@ -167,6 +169,7 @@ impl WindowsRemoteFileHandler {
     pub fn new(
         computer: Computer,
         copier_impl: Box<dyn FileCopier>,
+        custom_share_folder: Option<String>,
     ) -> WindowsRemoteFileHandler {
         let mut args = vec![
             "USE".to_string(),
@@ -183,7 +186,7 @@ impl WindowsRemoteFileHandler {
         ).expect(&format!(
             "Cannot establish connection using \"net use\" to {}", &computer.address
         ));
-        WindowsRemoteFileHandler { computer, copier_impl }
+        WindowsRemoteFileHandler { computer, copier_impl, custom_share_folder }
     }
 
     fn open_connection(
@@ -220,11 +223,37 @@ impl RemoteFileCopier for WindowsRemoteFileHandler {
         &self,
         path: &Path,
     ) -> PathBuf {
-        self.open_connection();
-        PathBuf::from(format!(
-            "\\\\{}\\{}",
-            self.remote_computer().address,
-            path.to_str().unwrap().replacen(":", "$", 1)
-        ))
+        match self.custom_share_folder.as_ref() {
+            None => {
+                self.open_connection();
+                PathBuf::from(format!(
+                    "\\\\{}\\{}",
+                    self.remote_computer().address,
+                    path.to_str().unwrap().replacen(":", "$", 1)
+                ))
+            }
+            // Some(custom_share) => {
+            //     self.open_connection();
+            //     PathBuf::from(format!(
+            //         "\\\\{}\\{}",
+            //         self.remote_computer().address,
+            //         path.to_str().unwrap().replacen(":", "$", 1).replace("C", custom_share)
+            //     ))
+            // }
+
+            Some(custom_share) => {
+                if custom_share.len() == 1 {
+                    PathBuf::from(
+                        path.to_str().unwrap().replace("C", custom_share)
+                    )
+                } else {
+                    PathBuf::from(format!(
+                        "\\\\{}\\{}",
+                        self.remote_computer().address,
+                        path.to_str().unwrap().replace("C:", custom_share)
+                    ))
+                }
+            }
+        }
     }
 }

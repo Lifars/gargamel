@@ -45,7 +45,7 @@ pub struct Opts {
     short = "r",
     long = "remote-storage",
     help = "Name of remote directory to be used as a temporary storage (Windows targets only).",
-    default_value = "C:\\Users\\Public"
+    default_value = "C:\\"
     )]
     pub remote_store_directory: String,
 
@@ -141,6 +141,12 @@ pub struct Opts {
     pub acquire_edb: bool,
 
     #[clap(
+    long = "svi",
+    help = "Optional: Acquire .lnk files from System Volume Information"
+    )]
+    pub acquire_svi_data: bool,
+
+    #[clap(
     long = "timeout",
     help = "Optional: Timeout in seconds for long running operations.\
     This option is a workaround for a bug in WMImplant.ps1 amd SharpRDP.exe where finishing of a long running operation cannot sometimes properly close the connection. This leaves the Gargamel in a seemingly frozen state or it may execute the next operation prematurely.\
@@ -173,6 +179,12 @@ pub struct Opts {
     long = "in-parallel",
     help = "Optional: Experimental. Enable parallelism when connecting to more remote computers.",
     )]
-    pub par: bool
+    pub par: bool,
+
+    #[clap(
+    long = "share",
+    help = "Optional: Use custom shared folder.",
+    )]
+    pub share: Option<String>
 }
 

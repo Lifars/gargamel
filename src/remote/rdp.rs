@@ -104,10 +104,6 @@ impl Connector for Rdp {
         prepared_command.push("takeover=true".to_string());
         prepared_command.push("connectdrive=true".to_string());
 
-//        if let Some(time) = self.timeout {
-//            prepared_command.push(format!("time={}", time.as_secs() * 60));
-//        }
-
         let command_joined: String = command.join(" ");
         let command_as_arg = match output_file_path {
             None => format!("command={}", command_joined),
@@ -118,7 +114,6 @@ impl Connector for Rdp {
                     .to_string_lossy()
                     .replacen(":", "", 1);
                 format!(
-//                     "command={} -p.i.p.e- Out-File -FilePath \\\\tsclient\\{}",
 "command=cmd.exe /c {} -p.i.p.e- Out-File -FilePath \\\\tsclient\\{}",
 command_joined,
 as_remote_path

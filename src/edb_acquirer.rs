@@ -17,16 +17,16 @@ pub struct EdbAcquirer<'a> {
 }
 
 impl<'a> EdbAcquirer<'a> {
-
     pub fn psexec32(
         remote_computer: Computer,
         local_store_directory: &'a Path,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>
     ) -> EdbAcquirer<'a> {
         EdbAcquirer {
             local_store_directory,
-            connector: Box::new(PsExec::psexec32(remote_computer, remote_temp_storage)),
+            connector: Box::new(PsExec::psexec32(remote_computer, remote_temp_storage, custom_share_folder)),
             image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },
@@ -49,11 +49,12 @@ impl<'a> EdbAcquirer<'a> {
         remote_computer: Computer,
         local_store_directory: &'a Path,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>
     ) -> EdbAcquirer<'a> {
         EdbAcquirer {
             local_store_directory,
-            connector: Box::new(PsExec::psexec64(remote_computer, remote_temp_storage)),
+            connector: Box::new(PsExec::psexec64(remote_computer, remote_temp_storage, custom_share_folder)),
             image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },
@@ -64,11 +65,12 @@ impl<'a> EdbAcquirer<'a> {
         remote_computer: Computer,
         local_store_directory: &'a Path,
         _no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>
     ) -> EdbAcquirer<'a> {
         EdbAcquirer {
             local_store_directory,
-            connector: Box::new(PsRemote::new(remote_computer, remote_temp_storage)),
+            connector: Box::new(PsRemote::new(remote_computer, remote_temp_storage, custom_share_folder)),
             image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: Compression::No,
@@ -81,7 +83,7 @@ impl<'a> EdbAcquirer<'a> {
         timeout: Duration,
         compress_timeout: Duration,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
     ) -> EdbAcquirer<'a> {
         EdbAcquirer {
             local_store_directory,
@@ -99,20 +101,21 @@ impl<'a> EdbAcquirer<'a> {
         image_timeout: Duration,
         compress_timeout: Duration,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
     ) -> EdbAcquirer<'a> {
         EdbAcquirer {
             local_store_directory,
             connector: Box::new(Rdp {
                 nla,
                 computer: remote_computer.clone(),
-                remote_temp_storage
+                remote_temp_storage,
             }),
             image_timeout: Some(image_timeout),
             compress_timeout: Some(compress_timeout),
             compression: if no_7zip { Compression::No } else { Compression::YesSplit },
         }
     }
+
 
     pub fn download_edb(
         &self
@@ -136,28 +139,6 @@ impl<'a> EdbAcquirer<'a> {
             create_vss_command,
             self.image_timeout,
         )?;
-        // if let None = vss_create_output_path {
-        //     return Err(io::Error::new(ErrorKind::InvalidData, "No output from VSS shadow create"))
-        // }
-        //
-        // let vss_create_output_path = vss_create_output_path.unwrap();
-        //
-        // let vss_shadow_id = {
-        //     let vss_create_output_file = fs::File::open(&vss_create_output_path)?;
-        //     io::BufReader::new(&vss_create_output_file)
-        //         .lines()
-        //         .filter_map(|it| it.ok())
-        //         .find(|it| it.starts_with("ShadowID"))
-        //         .map(|shadow_id_line| {
-        //             let id_start_idx = shadow_id_line.find('{').unwrap_or_default();
-        //             (shadow_id_line[id_start_idx+1..shadow_id_line.len()-1]).to_string()
-        //         })
-        // };
-        // fs::remove_file(&vss_create_output_path);
-        // if let None = vss_shadow_id {
-        //     return Err(io::Error::new(ErrorKind::InvalidData, "No output from VSS shadow create"))
-        // }
-        // let vss_shadow_id = vss_shadow_id.unwrap();
 
         let list_vss_command = Command {
             command: vec![
@@ -177,7 +158,7 @@ impl<'a> EdbAcquirer<'a> {
             self.image_timeout,
         )?;
         if let None = vss_list_output_path {
-            return Err(io::Error::new(ErrorKind::InvalidData, "No output from VSS shadow create"))
+            return Err(io::Error::new(ErrorKind::InvalidData, "No output from VSS shadow create"));
         }
 
         let vss_list_output_path = vss_list_output_path.unwrap();
@@ -189,15 +170,15 @@ impl<'a> EdbAcquirer<'a> {
                 .find(|it| it.contains("Shadow Copy Volume"))
                 .map(|shadow_volume_line| {
                     let id_start_idx = shadow_volume_line.find(':').unwrap_or_default();
-                    (shadow_volume_line[id_start_idx+2..]).to_string()
+                    (shadow_volume_line[id_start_idx + 2..]).to_string()
                 })
         };
-        fs::remove_file(&vss_list_output_path);
+        let _ = fs::remove_file(&vss_list_output_path);
         if let None = vss_shadow_volume_path {
-            return Err(io::Error::new(ErrorKind::InvalidData, "No output from VSS shadow list"))
+            return Err(io::Error::new(ErrorKind::InvalidData, "No output from VSS shadow list"));
         }
         let vss_shadow_volume_path = vss_shadow_volume_path.unwrap();
-        let vss_link_path = format!("C:\\Users\\Public\\{}", Uuid::new_v4().to_string().replace("-", ""));
+        let vss_link_path = format!("C:\\{}", Uuid::new_v4().to_string().replace("-", ""));
         let link_vss_command = Command {
             command: vec![
                 "cmd.exe".to_string(),

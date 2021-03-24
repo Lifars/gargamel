@@ -16,30 +16,30 @@ pub const PSEXEC64_NAME: &str = "PsExec64.exe";
 pub const PSEXEC32_NAME: &str = "PsExec.exe";
 
 impl PsExec {
-    pub fn paexec(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
+    pub fn paexec(computer: Computer, remote_temp_storage: PathBuf, custom_share_folder: Option<String>) -> PsExec {
         PsExec {
             computer: computer.clone(),
-            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {}), custom_share_folder),
             psexec_name: "paexec.exe".to_string(),
             remote_temp_storage,
             ms_psexec: false,
         }
     }
 
-    pub fn psexec32(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
+    pub fn psexec32(computer: Computer, remote_temp_storage: PathBuf, custom_share_folder: Option<String>) -> PsExec {
         PsExec {
             computer: computer.clone(),
-            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {}), custom_share_folder),
             psexec_name: PSEXEC32_NAME.to_string(),
             remote_temp_storage,
             ms_psexec: true,
         }
     }
 
-    pub fn psexec64(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
+    pub fn psexec64(computer: Computer, remote_temp_storage: PathBuf, custom_share_folder: Option<String>) -> PsExec {
         PsExec {
             computer: computer.clone(),
-            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {}), custom_share_folder),
             psexec_name: PSEXEC64_NAME.to_string(),
             remote_temp_storage,
             ms_psexec: true,

@@ -4,6 +4,7 @@ use std::{io, fs};
 use std::time::Duration;
 use fs_extra::dir::CopyOptions;
 use std::io::ErrorKind;
+use crate::remote::constants::REMOTE_PATH_STORAGE;
 
 pub struct Local {
     localhost: Computer
@@ -36,7 +37,7 @@ impl Connector for Local {
     }
 
     fn remote_temp_storage(&self) -> &Path {
-        Path::new("C:\\Users\\Public")
+        Path::new(REMOTE_PATH_STORAGE)
     }
 
     fn connect_and_run_local_program(

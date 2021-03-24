@@ -10,10 +10,10 @@ pub struct PsRemote {
 }
 
 impl PsRemote {
-    pub fn new(computer: Computer, remote_temp_storage: PathBuf) -> PsRemote {
+    pub fn new(computer: Computer, remote_temp_storage: PathBuf, custom_share_folder: Option<String>) -> PsRemote {
         PsRemote {
             computer: computer.clone(),
-            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Powershell {})),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Powershell {}), custom_share_folder),
             remote_temp_storage,
         }
     }

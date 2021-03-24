@@ -57,22 +57,24 @@ impl<'a> EvidenceAcquirer<'a> {
     pub fn psexec(
         remote_computer: Computer,
         store_directory: &'a Path,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new(
             store_directory,
-            Box::new(PsExec::paexec(remote_computer, remote_temp_storage)),
+            Box::new(PsExec::paexec(remote_computer, remote_temp_storage, custom_share_folder)),
         )
     }
 
     pub fn psremote(
         remote_computer: Computer,
         store_directory: &'a Path,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new(
             store_directory,
-            Box::new(PsRemote::new(remote_computer, remote_temp_storage)),
+            Box::new(PsRemote::new(remote_computer, remote_temp_storage, custom_share_folder)),
         )
     }
 

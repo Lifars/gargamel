@@ -39,5 +39,6 @@ pub mod download;
 pub use self::download::*;
 
 pub mod utils;
+mod constants;
 
 pub use self::utils::*;

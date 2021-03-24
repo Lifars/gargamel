@@ -61,11 +61,12 @@ impl<'a> RegistryAcquirer<'a> {
         store_directory: &'a Path,
         computer: Computer,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>
     ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(PsExec::psexec32(computer, remote_temp_storage)),
+            Box::new(PsExec::psexec32(computer, remote_temp_storage, custom_share_folder)),
             None,
             if no_7zip { Compression::No } else { Compression::Yes },
         )
@@ -85,11 +86,12 @@ impl<'a> RegistryAcquirer<'a> {
         store_directory: &'a Path,
         computer: Computer,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>
     ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(PsExec::psexec64(computer, remote_temp_storage)),
+            Box::new(PsExec::psexec64(computer, remote_temp_storage, custom_share_folder)),
             None,
             if no_7zip { Compression::No } else { Compression::Yes },
         )
@@ -99,11 +101,12 @@ impl<'a> RegistryAcquirer<'a> {
         store_directory: &'a Path,
         computer: Computer,
         _no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>
     ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(PsRemote::new(computer, remote_temp_storage)),
+            Box::new(PsRemote::new(computer, remote_temp_storage, custom_share_folder)),
             None,
             Compression::No,
         )

@@ -1,0 +1,1 @@
+pub const REMOTE_PATH_STORAGE: &str = "C:\\";
