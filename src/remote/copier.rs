@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf, Component};
-use crate::remote::{Computer, Connector};
+use crate::remote::{Computer, Connector, Command};
 use std::io;
 use crate::process_runner::run_process_blocking;
 use std::env::temp_dir;
@@ -54,6 +54,64 @@ impl FileCopier for Cmd {
 
     fn method_name(&self) -> &'static str {
         "XCopy"
+    }
+}
+
+pub struct RemoteCmd<'a> {
+    connector: &'a dyn Connector
+}
+
+impl RemoteCmd<'_> {
+    pub fn new<'a>(connector: &'a dyn Connector) -> RemoteCmd {
+        RemoteCmd { connector }
+    }
+}
+
+impl FileCopier for RemoteCmd<'_> {
+    fn copy_file(
+        &self,
+        source: &Path,
+        target: &Path,
+    ) -> io::Result<()> {
+        self.connector.connect_and_run_command(
+            Command::new(
+                vec![
+                    "xcopy".to_string(),
+                    "/y".to_string(),
+                    "/i".to_string(),
+                    "/c".to_string(),
+                    source.to_string_lossy().to_string(),
+                    target.to_string_lossy().to_string(),
+                ],
+                None,
+                "",
+                true,
+            ),
+            None,
+        ).map(|_| ())
+    }
+
+    fn delete_file(&self, target: &Path) -> io::Result<()> {
+        self.connector.connect_and_run_command(
+            Command::new(
+                vec![
+                    "cmd.exe".to_string(),
+                    "/c".to_string(),
+                    "del".to_string(),
+                    "/F".to_string(),
+                    "/Q".to_string(),
+                    target.to_string_lossy().to_string(),
+                ],
+                None,
+                "",
+                true,
+            ),
+            None,
+        ).map(|_| ())
+    }
+
+    fn method_name(&self) -> &'static str {
+        "RemoteXCopy"
     }
 }
 
@@ -151,17 +209,19 @@ pub struct WindowsRemoteFileHandler {
 
 impl Drop for WindowsRemoteFileHandler {
     fn drop(&mut self) {
-        run_process_blocking(
-            "NET",
-            &[
-                "USE".to_string(),
-                format!("\\\\{}", self.computer.address),
-                // format!("\\\\{}", self.computer.address),
-                "/D".to_string()
-            ],
-        ).expect(&format!(
-            "Cannot drop connection using \"net use\" to {}", self.computer.address
-        ));
+        if self.custom_share_folder.is_none() {
+            run_process_blocking(
+                "NET",
+                &[
+                    "USE".to_string(),
+                    format!("\\\\{}", self.computer.address),
+                    // format!("\\\\{}", self.computer.address),
+                    "/D".to_string()
+                ],
+            ).expect(&format!(
+                "Cannot drop connection using \"net use\" to {}", self.computer.address
+            ));
+        }
     }
 }
 
@@ -171,22 +231,12 @@ impl WindowsRemoteFileHandler {
         copier_impl: Box<dyn FileCopier>,
         custom_share_folder: Option<String>,
     ) -> WindowsRemoteFileHandler {
-        let mut args = vec![
-            "USE".to_string(),
-            format!("\\\\{}", computer.address),
-        ];
-        let username = computer.domain_username();
-        args.push(format!("/u:{}", username));
-        if let Some(password) = &computer.password {
-            args.push(password.clone());
+        let no_custom_share_folder = custom_share_folder.is_none();
+        let result = WindowsRemoteFileHandler { computer, copier_impl, custom_share_folder };
+        if no_custom_share_folder {
+            result.open_connection();
         }
-        run_process_blocking(
-            "NET",
-            &args,
-        ).expect(&format!(
-            "Cannot establish connection using \"net use\" to {}", &computer.address
-        ));
-        WindowsRemoteFileHandler { computer, copier_impl, custom_share_folder }
+        result
     }
 
     fn open_connection(
@@ -257,3 +307,97 @@ impl RemoteFileCopier for WindowsRemoteFileHandler {
         }
     }
 }
+
+pub const GARGAMEL_SHARED_FOLDER_NAME: &str = "GargamelShare";
+//
+// pub struct WindowsReverseShareRemoteFileHandler<'a> {
+//     connector: &'a dyn Connector,
+//     copier_impl: RemoteCmd<'a>,
+// }
+//
+// impl Drop for WindowsReverseShareRemoteFileHandler {
+//     fn drop(&mut self) {
+//         if self.custom_share_folder.is_none() {
+//             run_process_blocking(
+//                 "NET",
+//                 &[
+//                     "share".to_string(),
+//                     // format!("\\\\{}", self.computer.address),
+//                     "/D".to_string(),
+//                     GARGAMEL_SHARED_FOLDER_NAME.to_string()
+//                 ],
+//             ).expect(&format!(
+//                 "Cannot drop connection using \"net share\" to {}", GARGAMEL_SHARED_FOLDER_NAME
+//             ));
+//         }
+//     }
+// }
+//
+// impl WindowsReverseShareRemoteFileHandler {
+//     pub fn new<'a>(
+//         connector: &'a dyn Connector,
+//     ) -> WindowsReverseShareRemoteFileHandler {
+//         let result = WindowsReverseShareRemoteFileHandler { connector, copier_impl: RemoteCmd { connector } };
+//         if custom_share_folder.is_none() {
+//             result.open_connection();
+//         }
+//         result
+//     }
+//
+//     fn open_connection(
+//         &self
+//     ) {
+//         let mut args = vec![
+//             "share".to_string(),
+//             format!("{}=C:", GARGAMEL_SHARED_FOLDER_NAME),
+//             "/GRANT:Everyone,FULL"
+//         ];
+//         run_process_blocking(
+//             "NET",
+//             &args,
+//         ).expect(&format!(
+//             "Cannot establish share using \"net share\" for {}=C:", GARGAMEL_SHARED_FOLDER_NAME
+//         ));
+//     }
+// }
+//
+// impl RemoteFileCopier for WindowsReverseShareRemoteFileHandler {
+//     fn remote_computer(&self) -> &Computer {
+//         &self.connector.computer()
+//     }
+//
+//     fn copier_impl(&self) -> &dyn FileCopier {
+//         &self.copier_impl
+//     }
+//
+//     fn path_to_remote_form(
+//         &self,
+//         path: &Path,
+//     ) -> PathBuf {
+//         PathBuf::from(format!(
+//             "\\\\{}\\{}",
+//             hostname::get()?,
+//             path.to_str().unwrap().replace("C:", GARGAMEL_SHARED_FOLDER_NAME)
+//         ))
+//     }
+//
+//     fn copy_to_remote(
+//         &self,
+//         source: &Path,
+//         target: &Path,
+//     ) -> io::Result<()> {
+//         self.copier_impl().copy_file(&self.path_to_remote_form(source), target)
+//     }
+//
+//     fn delete_remote_file(&self, target: &Path) -> io::Result<()> {
+//         self.copier_impl().delete_file(target)
+//     }
+//
+//     fn copy_from_remote(
+//         &self,
+//         source: &Path,
+//         target: &Path,
+//     ) -> io::Result<()> {
+//         self.copier_impl().copy_file(&self.path_to_remote_form(source), target)
+//     }
+// }

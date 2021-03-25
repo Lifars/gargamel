@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression, Local};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression, Local, RevShareConnector};
 use std::path::{Path, PathBuf};
 use std::{io, thread};
 use std::time::Duration;
@@ -13,17 +13,18 @@ pub struct MemoryAcquirer<'a> {
 }
 
 impl<'a> MemoryAcquirer<'a> {
-
     pub fn psexec32(
         remote_computer: Computer,
         local_store_directory: &'a Path,
         no_7zip: bool,
         remote_temp_storage: PathBuf,
-        custom_share_folder: Option<String>
+        custom_share_folder: Option<String>,
+        reverse: bool,
     ) -> MemoryAcquirer<'a> {
+        let connector = Box::new(PsExec::psexec32(remote_computer, remote_temp_storage, custom_share_folder));
         MemoryAcquirer {
             local_store_directory,
-            connector: Box::new(PsExec::psexec32(remote_computer, remote_temp_storage, custom_share_folder)),
+            connector: if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
             image_timeout: None,
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },
@@ -47,11 +48,13 @@ impl<'a> MemoryAcquirer<'a> {
         local_store_directory: &'a Path,
         no_7zip: bool,
         remote_temp_storage: PathBuf,
-        custom_share_folder: Option<String>
+        custom_share_folder: Option<String>,
+        reverse: bool,
     ) -> MemoryAcquirer<'a> {
+        let connector = Box::new(PsExec::psexec64(remote_computer, remote_temp_storage, custom_share_folder));
         MemoryAcquirer {
             local_store_directory,
-            connector: Box::new(PsExec::psexec64(remote_computer, remote_temp_storage, custom_share_folder)),
+            connector: if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
             image_timeout: None,
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },
@@ -63,11 +66,13 @@ impl<'a> MemoryAcquirer<'a> {
         local_store_directory: &'a Path,
         _no_7zip: bool,
         remote_temp_storage: PathBuf,
-        custom_share_folder: Option<String>
+        custom_share_folder: Option<String>,
+        reverse: bool,
     ) -> MemoryAcquirer<'a> {
+        let connector = Box::new(PsRemote::new(remote_computer, remote_temp_storage, custom_share_folder));
         MemoryAcquirer {
             local_store_directory,
-            connector: Box::new(PsRemote::new(remote_computer, remote_temp_storage, custom_share_folder)),
+            connector: if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
             image_timeout: None,
             compress_timeout: None,
             compression: Compression::No,
@@ -80,7 +85,7 @@ impl<'a> MemoryAcquirer<'a> {
         timeout: Duration,
         compress_timeout: Duration,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
@@ -98,14 +103,14 @@ impl<'a> MemoryAcquirer<'a> {
         image_timeout: Duration,
         compress_timeout: Duration,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
             connector: Box::new(Rdp {
                 nla,
                 computer: remote_computer.clone(),
-                remote_temp_storage
+                remote_temp_storage,
             }),
             image_timeout: Some(image_timeout),
             compress_timeout: Some(compress_timeout),
@@ -125,7 +130,7 @@ impl<'a> MemoryAcquirer<'a> {
             self.connector.remote_temp_storage(),
             "mem-image",
             self.connector.connect_method_name(),
-            "aff4"
+            "aff4",
         );
         let connection = Command {
             command: vec![

@@ -36,12 +36,12 @@ impl<'a> Archiver<'a> {
     }
 
     pub fn compress(&self, path: &Path, split: bool) -> PathBuf {
-        let extracted_file_name = format!("{}_{}__{}.7z",
-                                          self.connector.computer().address.replace(".", "-"),
-                                          path_join_to_string_ntfs(path),
-                                          Uuid::new_v4().to_string().replace("-", "")
-        );
-        let path_string_7z = self.connector.remote_temp_storage().join(extracted_file_name);
+        let archive_file_name = format!("{}_{}__{}.7z",
+                                        self.connector.computer().address.replace(".", "-"),
+                                        path_join_to_string_ntfs(path),
+                                        Uuid::new_v4().to_string().replace("-", "")
+        ).replace(" ", "");
+        let path_string_7z = self.connector.remote_temp_storage().join(archive_file_name);
         let mut run_params = vec![
             "7za.exe".to_string(),
         ];
@@ -66,7 +66,7 @@ impl<'a> Archiver<'a> {
             command: run_params,
             report_store_directory: None,
             report_filename_prefix: "",
-            elevated: false,
+            elevated: true,
         };
         if let Err(err) = self.connector.connect_and_run_local_program_in_current_directory(
             command,
@@ -97,7 +97,7 @@ impl<'a> Archiver<'a> {
             ],
             report_store_directory: None,
             report_filename_prefix: "",
-            elevated: false,
+            elevated: true,
         };
         self.connector.connect_and_run_local_program_in_current_directory(
             command,

@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression, Local};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression, Local, RevShareConnector};
 use std::path::{Path, PathBuf};
 use std::{io, thread, fs};
 use std::time::Duration;
@@ -22,11 +22,13 @@ impl<'a> SystemVolumeInformationAcquirer<'a> {
         local_store_directory: &'a Path,
         no_7zip: bool,
         remote_temp_storage: PathBuf,
-        custom_share_folder: Option<String>
+        custom_share_folder: Option<String>,
+        reverse: bool,
     ) -> SystemVolumeInformationAcquirer<'a> {
+        let connector = Box::new(PsExec::psexec32(remote_computer, remote_temp_storage, custom_share_folder));
         SystemVolumeInformationAcquirer {
             local_store_directory,
-            connector: Box::new(PsExec::psexec32(remote_computer, remote_temp_storage, custom_share_folder)),
+            connector: if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
             image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },
@@ -50,11 +52,13 @@ impl<'a> SystemVolumeInformationAcquirer<'a> {
         local_store_directory: &'a Path,
         no_7zip: bool,
         remote_temp_storage: PathBuf,
-        custom_share_folder: Option<String>
+        custom_share_folder: Option<String>,
+        reverse: bool,
     ) -> SystemVolumeInformationAcquirer<'a> {
+        let connector = Box::new(PsExec::psexec64(remote_computer, remote_temp_storage, custom_share_folder));
         SystemVolumeInformationAcquirer {
             local_store_directory,
-            connector: Box::new(PsExec::psexec64(remote_computer, remote_temp_storage, custom_share_folder)),
+            connector: if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
             image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },
@@ -66,11 +70,13 @@ impl<'a> SystemVolumeInformationAcquirer<'a> {
         local_store_directory: &'a Path,
         _no_7zip: bool,
         remote_temp_storage: PathBuf,
-        custom_share_folder: Option<String>
+        custom_share_folder: Option<String>,
+        reverse: bool,
     ) -> SystemVolumeInformationAcquirer<'a> {
+        let connector = Box::new(PsRemote::new(remote_computer, remote_temp_storage, custom_share_folder));
         SystemVolumeInformationAcquirer {
             local_store_directory,
-            connector: Box::new(PsRemote::new(remote_computer, remote_temp_storage, custom_share_folder)),
+            connector: if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
             image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: Compression::No,

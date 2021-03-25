@@ -145,7 +145,7 @@ impl RemoteFileCopier for PsExec {
                 ],
                 report_store_directory: None,
                 report_filename_prefix: "",
-                elevated: false,
+                elevated: true,
             },
             None,
         ).map(|_| ())

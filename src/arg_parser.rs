@@ -135,10 +135,10 @@ pub struct Opts {
     pub image_memory: bool,
 
     #[clap(
-    long = "edb",
-    help = "Optional: Acquire Windows search index file."
+    long = "shadow",
+    help = "Optional: Acquire system files from shadow volume."
     )]
-    pub acquire_edb: bool,
+    pub shadow: bool,
 
     #[clap(
     long = "svi",
@@ -185,6 +185,12 @@ pub struct Opts {
     long = "share",
     help = "Optional: Use custom shared folder.",
     )]
-    pub share: Option<String>
+    pub share: Option<String>,
+
+    #[clap(
+    long = "reverse-share",
+    help = "Optional: Dangerous!. Reverse copy operations for --psexec and --psrem. By default, Gargamel creates temporary (or uses) shared folders to target's C drive. This option creates a temporary shared folder of the host's C drive and exposes it to the target.",
+    )]
+    pub reverse_share: bool
 }
 

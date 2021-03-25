@@ -14,6 +14,7 @@ pub(crate) struct LargeEvidenceAcquirer<'a> {
 }
 
 impl<'a> LargeEvidenceAcquirer<'a> {
+
     pub(crate) fn run(
         &self,
         command: &[String],
@@ -43,7 +44,7 @@ impl<'a> LargeEvidenceAcquirer<'a> {
             command,
             None,
             report_filename_prefix,
-            false,
+            true,
         );
 
         info!("{}: Checking {}",
