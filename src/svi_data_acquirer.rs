@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression, Local, RevShareConnector};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, SevenZipCompressCopier, RemoteFileCopier, Compression, Local, RevShareConnector};
 use std::path::{Path, PathBuf};
 use std::{io, thread, fs};
 use std::time::Duration;
@@ -36,11 +36,13 @@ impl<'a> SystemVolumeInformationAcquirer<'a> {
     }
 
     pub fn local(
+        username: String,
         local_store_directory: &'a Path,
+        temp_storage: PathBuf
     ) -> SystemVolumeInformationAcquirer<'a> {
         SystemVolumeInformationAcquirer {
             local_store_directory,
-            connector: Box::new(Local::new()),
+            connector: Box::new(Local::new(username, temp_storage)),
             image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: Compression::No,
@@ -122,65 +124,18 @@ impl<'a> SystemVolumeInformationAcquirer<'a> {
         }
     }
 
-    fn acquire_perms(&self) {
-        debug!("Acquiring SVI ownership");
-        let grant_svi = Command {
-            command: vec![
-                "cmd.exe".to_string(),
-                "/c".to_string(),
-                "icacls.exe".to_string(),
-                "C:\\System Volume Information".to_string(),
-                "/grant".to_string(),
-                format!("{}:F", self.connector.computer().username)
-            ],
-            report_store_directory: None,
-            report_filename_prefix: "GRANT_VSI",
-            elevated: true,
-        };
 
-        if let Err(err) = self.connector.connect_and_run_command(
-            grant_svi,
-            None,
-        ) {
-            warn!("Cannot acquire SVI ownership: {}", err)
-        }
-        thread::sleep(Duration::from_secs(5));
-    }
 
-    fn release_perms(&self) {
-        thread::sleep(Duration::from_secs(5));
-        debug!("Releasing SVI ownership");
-        let grant_svi = Command {
-            command: vec![
-                "cmd.exe".to_string(),
-                "/c".to_string(),
-                "icacls.exe".to_string(),
-                "C:\\System Volume Information".to_string(),
-                "/deny".to_string(),
-                format!("{}:F", self.connector.computer().username)
-            ],
-            report_store_directory: None,
-            report_filename_prefix: "DENY_VSI",
-            elevated: true,
-        };
-
-        if let Err(err) = self.connector.connect_and_run_command(
-            grant_svi,
-            None,
-        ) {
-            warn!("Cannot release SVI ownership: {}", err)
-        }
-    }
 
     pub fn download_data(
         &self
     ) -> io::Result<()> {
         let local_store_directory = self.local_store_directory;
-        self.acquire_perms();
+        self.connector.acquire_perms(Path::new("C:\\System Volume Information"));
 
         let _copier = self.connector.copier();
-        let _compression_split_copier = CompressCopier::new(self.connector.as_ref(), true, self.compress_timeout, false);
-        let _compression_copier = CompressCopier::new(self.connector.as_ref(), false, self.compress_timeout, false);
+        let _compression_split_copier = SevenZipCompressCopier::new(self.connector.as_ref(), true, self.compress_timeout, false);
+        let _compression_copier = SevenZipCompressCopier::new(self.connector.as_ref(), false, self.compress_timeout, false);
         let copier = match self.compression {
             Compression::No => _copier,
             Compression::Yes => &_compression_copier as &dyn RemoteFileCopier,
@@ -202,7 +157,7 @@ impl<'a> SystemVolumeInformationAcquirer<'a> {
         }
         thread::sleep(Duration::from_millis(20000));
 
-        self.release_perms();
+        self.connector.release_perms(Path::new("C:\\System Volume Information"));
         Ok(())
     }
 }

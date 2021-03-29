@@ -15,27 +15,35 @@ pub enum Compression {
     YesSplit,
 }
 
-pub struct Archiver<'a> {
+pub trait Archiver {
+    fn compress(&self, path: &Path, split: bool) -> PathBuf;
+    fn uncompress(&self, path: &Path) -> io::Result<()>;
+}
+
+pub struct SevenZipArchiver<'a> {
     connector: &'a dyn Connector,
     timeout: Option<Duration>,
 }
 
-impl<'a> Archiver<'a> {
+impl<'a> SevenZipArchiver<'a> {
     pub fn remote(
         connector: &'a dyn Connector,
         timeout: Option<Duration>,
-    ) -> Archiver<'a> {
-        Archiver {
+    ) -> SevenZipArchiver<'a> {
+        SevenZipArchiver {
             connector,
             timeout,
         }
     }
 
-    pub fn local(local: &'a Local) -> Archiver {
-        Archiver::remote(local, None)
+    pub fn local(local: &'a Local) -> SevenZipArchiver {
+        SevenZipArchiver::remote(local, None)
     }
+}
 
-    pub fn compress(&self, path: &Path, split: bool) -> PathBuf {
+
+impl<'a> Archiver for SevenZipArchiver<'a> {
+    fn compress(&self, path: &Path, split: bool) -> PathBuf {
         let archive_file_name = format!("{}_{}__{}.7z",
                                         self.connector.computer().address.replace(".", "-"),
                                         path_join_to_string_ntfs(path),
@@ -84,7 +92,7 @@ impl<'a> Archiver<'a> {
         path_string_7z
     }
 
-    pub fn uncompress(&self, path: &Path) -> io::Result<()> {
+    fn uncompress(&self, path: &Path) -> io::Result<()> {
         let path_string = path.to_string_lossy().to_string();
         let command = Command {
             command: vec![
@@ -106,59 +114,59 @@ impl<'a> Archiver<'a> {
     }
 }
 
-pub struct ArchiverOwned {
+pub struct SevenZipArchiverOwned {
     connector: Box<dyn Connector>,
     timeout: Option<Duration>,
 }
 
-impl ArchiverOwned {
+impl SevenZipArchiverOwned {
     pub fn remote(
         connector: Box<dyn Connector>,
         timeout: Option<Duration>,
-    ) -> ArchiverOwned {
-        ArchiverOwned {
+    ) -> SevenZipArchiverOwned {
+        SevenZipArchiverOwned {
             connector,
             timeout,
         }
     }
 
-    pub fn local(local: Box<Local>) -> ArchiverOwned {
-        ArchiverOwned::remote(local, None)
+    pub fn local(local: Box<Local>) -> SevenZipArchiverOwned {
+        SevenZipArchiverOwned::remote(local, None)
     }
 
     pub fn compress(&self, path: &Path, split: bool) -> PathBuf {
-        Archiver { connector: self.connector.as_ref(), timeout: self.timeout.clone() }
+        SevenZipArchiver { connector: self.connector.as_ref(), timeout: self.timeout.clone() }
             .compress(path, split)
     }
 
     pub fn uncompress(&self, path: &Path) -> io::Result<()> {
-        Archiver { connector: self.connector.as_ref(), timeout: self.timeout.clone() }
+        SevenZipArchiver { connector: self.connector.as_ref(), timeout: self.timeout.clone() }
             .uncompress(path)
     }
 }
 
-pub struct CompressCopier<'a> {
-    archiver: Archiver<'a>,
+pub struct SevenZipCompressCopier<'a> {
+    archiver: SevenZipArchiver<'a>,
     split: bool,
     uncompress_downloaded: bool,
 }
 
-impl<'a> CompressCopier<'a> {
+impl<'a> SevenZipCompressCopier<'a> {
     pub fn new(
         connector: &'a dyn Connector,
         split: bool,
         timeout: Option<Duration>,
         uncompress_downloaded: bool,
-    ) -> CompressCopier {
-        CompressCopier {
-            archiver: Archiver::remote(connector, timeout),
+    ) -> SevenZipCompressCopier {
+        SevenZipCompressCopier {
+            archiver: SevenZipArchiver::remote(connector, timeout),
             split,
             uncompress_downloaded,
         }
     }
 }
 
-impl<'a> RemoteFileCopier for CompressCopier<'a> {
+impl<'a> RemoteFileCopier for SevenZipCompressCopier<'a> {
     fn remote_computer(&self) -> &Computer {
         self.archiver.connector.computer()
     }
@@ -174,8 +182,8 @@ impl<'a> RemoteFileCopier for CompressCopier<'a> {
     fn copy_to_remote(&self, source: &Path, target: &Path) -> Result<(), Error> {
         trace!("Copying {} to {} using compression", source.display(), &self.archiver.connector.computer().address);
         let remote_copier_impl = self.archiver.connector.copier();
-        let local = Local::new();
-        let local_archiver = Archiver::local(&local);
+        let local = Local::new_default(self.archiver.connector.computer().username.clone());
+        let local_archiver = SevenZipArchiver::local(&local);
 
         let archived_source = local_archiver.compress(source, self.split);
         let wait_time_s = Duration::from_secs(1);
@@ -256,7 +264,7 @@ impl<'a> RemoteFileCopier for CompressCopier<'a> {
 }
 
 
-impl CompressCopier<'_> {
+impl SevenZipCompressCopier<'_> {
     fn copy_from_remote_impl(&self, source: &Path, target: &Path) -> Result<(), Error> {
         trace!("Copying {} from {} using compression", source.display(), &self.archiver.connector.computer().address);
         let archived_source =
@@ -271,8 +279,8 @@ impl CompressCopier<'_> {
 
         let remote_copier_impl = self.archiver.connector.copier();
 
-        let local = Local::new();
-        let local_archiver = Archiver::local(&local);
+        let local = Local::new_default(self.archiver.connector.computer().username.clone());
+        let local_archiver = SevenZipArchiver::local(&local);
 
         if self.split {
             self.copy_from_remote_splitted(target, wait_time_s, wait_time_l, &archived_source, remote_copier_impl, &local, &local_archiver)
@@ -288,7 +296,7 @@ impl CompressCopier<'_> {
                                  archived_source: &Path,
                                  remote_copier_impl: &dyn RemoteFileCopier,
                                  local: &Local,
-                                 local_archiver: &Archiver,
+                                 local_archiver: &SevenZipArchiver,
     ) {
         let mut unsuccessful_trials = 0;
         let mut i = 0;
@@ -344,7 +352,7 @@ impl CompressCopier<'_> {
                               archived_source: &Path,
                               remote_copier_impl: &dyn RemoteFileCopier,
                               local: &Local,
-                              local_archiver: &Archiver,
+                              local_archiver: &SevenZipArchiver,
     ) {
         if let Err(err) = remote_copier_impl.copy_from_remote(archived_source, target) {
             debug!("{}", err);
@@ -405,7 +413,7 @@ impl RemoteFileCopier for CompressCopierOwned {
     }
 
     fn copy_to_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
-        CompressCopier::new(self.connector.as_ref(), self.split, self.timeout.clone(), self.uncompress_downloaded)
+        SevenZipCompressCopier::new(self.connector.as_ref(), self.split, self.timeout.clone(), self.uncompress_downloaded)
             .copy_to_remote(source, target)
     }
 
@@ -414,7 +422,7 @@ impl RemoteFileCopier for CompressCopierOwned {
     }
 
     fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
-        CompressCopier::new(self.connector.as_ref(), self.split, self.timeout.clone(), self.uncompress_downloaded)
+        SevenZipCompressCopier::new(self.connector.as_ref(), self.split, self.timeout.clone(), self.uncompress_downloaded)
             .copy_from_remote(source, target)
     }
 

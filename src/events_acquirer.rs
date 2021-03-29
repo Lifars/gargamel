@@ -74,11 +74,13 @@ impl<'a> EventsAcquirer<'a> {
     }
 
     pub fn local(
+        username: String,
         store_directory: &'a Path,
+        temp_storage: PathBuf,
     ) -> EventsAcquirer {
         EventsAcquirer::new(
             store_directory,
-            Box::new(Local::new()),
+            Box::new(Local::new(username, temp_storage)),
             None,
             Compression::No,
         )

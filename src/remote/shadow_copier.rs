@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression, Local, FileCopier};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, SevenZipCompressCopier, RemoteFileCopier, Compression, Local, FileCopier};
 use std::path::{Path, PathBuf, StripPrefixError};
 use std::{io, thread, fs};
 use std::time::Duration;
@@ -14,7 +14,7 @@ use std::fmt::format;
 
 pub struct ShadowCopier<'a> {
     connector_impl: &'a dyn Connector,
-    copier_impl: &'a dyn RemoteFileCopier,
+    pub copier_impl: &'a dyn RemoteFileCopier,
     shadow_drive: PathBuf,
 }
 
@@ -46,12 +46,13 @@ impl<'a> ShadowCopier<'a> {
                 "/c".to_string(),
                 "powershell.exe".to_string(),
                 "-Command".to_string(),
-                "\"(gwmi -list win32_shadowcopy).Create('C:\\','ClientAccessible')\"".to_string()
+                "(gwmi -list win32_shadowcopy).Create('C:\\','ClientAccessible')".to_string()
             ],
             report_store_directory: None,
             report_filename_prefix: "VSS_RESULT",
             elevated: true,
         };
+
         let timeout = Some(Duration::from_secs(20));
         if let Err(err) = connector.connect_and_run_command(
             create_vss_command,
@@ -60,7 +61,6 @@ impl<'a> ShadowCopier<'a> {
             error!("{}", io::Error::new(ErrorKind::InvalidData, "No output from VSS shadow create"));
             return PathBuf::from("C:\\");
         }
-
         let list_vss_command = Command {
             command: vec![
                 "cmd.exe".to_string(),
@@ -119,13 +119,15 @@ impl<'a> ShadowCopier<'a> {
                 "/c".to_string(),
                 "mklink".to_string(),
                 "/d".to_string(),
-                format!("{}\\", vss_link_path.to_string_lossy().to_string()),
-                vss_shadow_volume_path
+                vss_link_path.to_string_lossy().to_string(),
+                format!("{}\\", vss_shadow_volume_path.to_string()),
             ],
             report_store_directory: Some(local_store_directory),
             report_filename_prefix: "",
             elevated: true,
         };
+
+        connector.acquire_perms(&vss_link_path);
         if let Err(err) = connector.connect_and_run_command(
             link_vss_command,
             timeout.clone(),
@@ -192,6 +194,7 @@ fn delete_shadow_copy(
     connector: &dyn Connector,
     shadow_path: &Path,
 ) {
+    connector.release_perms(shadow_path);
     let unlink_vss_command = Command {
         command: vec![
             "cmd.exe".to_string(),

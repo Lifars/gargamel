@@ -75,10 +75,13 @@ impl<'a> RegistryAcquirer<'a> {
     }
 
     pub fn local(
-        store_directory: &'a Path) -> RegistryAcquirer {
+        username: String,
+        store_directory: &'a Path,
+        temp_storage: PathBuf
+    ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(Local::new()),
+            Box::new(Local::new(username, temp_storage)),
             None,
             Compression::No,
         )

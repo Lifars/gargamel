@@ -37,11 +37,12 @@ impl<'a> CommandRunner<'a> {
     }
 
     pub fn local(
+        username: String,
         local_store_directory: &'a Path,
     ) -> CommandRunner<'a> {
         CommandRunner {
             local_store_directory,
-            connector: Box::new(Local::new()),
+            connector: Box::new(Local::new(username, local_store_directory.to_path_buf())),
             run_implicit: true,
         }
     }

@@ -37,10 +37,6 @@ pub struct Command<'a> {
 
 impl From<Opts> for Computer {
     fn from(opts: Opts) -> Self {
-        if opts.computer == "127.0.0.1" || opts.computer == "localhost" {
-            return Local::new().computer().clone();
-        }
-
         let (domain, username) = match &opts.user {
             Some(user) => if user.is_empty() {
                 (None, "".to_string())
@@ -58,6 +54,9 @@ impl From<Opts> for Computer {
                 (if domain.trim().is_empty() { None } else { Some(domain) }, user)
             }
         };
+        if opts.computer == "127.0.0.1" || opts.computer == "localhost" {
+            return Local::new(username, PathBuf::from(opts.remote_store_directory)).computer().clone();
+        }
         let password = match &opts.password {
             Some(password) => if password.is_empty() {
                 None
@@ -192,6 +191,23 @@ pub trait Connector {
 
     fn remote_temp_storage(&self) -> &Path;
 
+    fn mkdir(&self, path: &Path) {
+        let command = Command::new(
+            vec![
+                "cmd.exe".to_string(),
+                "/c".to_string(),
+                "md".to_string(),
+                path.to_str().unwrap_or_default().to_string(),
+            ],
+            None,
+            "",
+            true,
+        );
+        if let Err(err) = self.connect_and_run_command(command, Some(Duration::from_secs(10))) {
+            error!("{}", err);
+        }
+    }
+
     fn connect_and_run_local_program_in_current_directory(
         &self,
         command_to_run: Command<'_>,
@@ -232,7 +248,7 @@ pub trait Connector {
             command,
             ..command_to_run
         };
-        let result =self.connect_and_run_command(command_to_run, timeout)?;
+        let result = self.connect_and_run_command(command_to_run, timeout)?;
         thread::sleep(Duration::from_millis(10_000));
         copier.delete_remote_file(&remote_program_path)?;
         Ok(result)
@@ -353,5 +369,55 @@ pub trait Connector {
             error!("{}", err);
         }
         result
+    }
+
+    fn acquire_perms(&self, path: &Path) {
+        debug!("Acquiring ownership");
+        let grant_svi = Command {
+            command: vec![
+                "cmd.exe".to_string(),
+                "/c".to_string(),
+                "icacls.exe".to_string(),
+                path.to_string_lossy().to_string(),
+                "/grant".to_string(),
+                format!("{}:F", self.computer().username)
+            ],
+            report_store_directory: None,
+            report_filename_prefix: "GRANT_VSI",
+            elevated: true,
+        };
+
+        if let Err(err) = self.connect_and_run_command(
+            grant_svi,
+            None,
+        ) {
+            warn!("Cannot acquire ownership: {}", err)
+        }
+        thread::sleep(Duration::from_secs(5));
+    }
+
+    fn release_perms(&self, path: &Path) {
+        thread::sleep(Duration::from_secs(5));
+        debug!("Releasing ownership");
+        let grant_svi = Command {
+            command: vec![
+                "cmd.exe".to_string(),
+                "/c".to_string(),
+                "icacls.exe".to_string(),
+                path.to_string_lossy().to_string(),
+                "/deny".to_string(),
+                format!("{}:F", self.computer().username)
+            ],
+            report_store_directory: None,
+            report_filename_prefix: "DENY_VSI",
+            elevated: true,
+        };
+
+        if let Err(err) = self.connect_and_run_command(
+            grant_svi,
+            None,
+        ) {
+            warn!("Cannot release ownership: {}", err)
+        }
     }
 }

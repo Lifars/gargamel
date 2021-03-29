@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, CompressCopier, RemoteFileCopier, Compression, Local, RevShareConnector};
+use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, SevenZipCompressCopier, RemoteFileCopier, Compression, Local, RevShareConnector};
 use std::path::{Path, PathBuf};
 use std::{io, thread};
 use std::time::Duration;
@@ -32,11 +32,13 @@ impl<'a> MemoryAcquirer<'a> {
     }
 
     pub fn local(
+        username: String,
         local_store_directory: &'a Path,
+        temp_storage: PathBuf,
     ) -> MemoryAcquirer<'a> {
         MemoryAcquirer {
             local_store_directory,
-            connector: Box::new(Local::new()),
+            connector: Box::new(Local::new(username, temp_storage)),
             image_timeout: None,
             compress_timeout: None,
             compression: Compression::No,
@@ -150,8 +152,8 @@ impl<'a> MemoryAcquirer<'a> {
             self.image_timeout,
         )?;
         let _copier = self.connector.copier();
-        let _compression_split_copier = CompressCopier::new(self.connector.as_ref(), true, self.compress_timeout, false);
-        let _compression_copier = CompressCopier::new(self.connector.as_ref(), false, self.compress_timeout, false);
+        let _compression_split_copier = SevenZipCompressCopier::new(self.connector.as_ref(), true, self.compress_timeout, false);
+        let _compression_copier = SevenZipCompressCopier::new(self.connector.as_ref(), false, self.compress_timeout, false);
         let copier = match self.compression {
             Compression::No => _copier,
             Compression::Yes => &_compression_copier as &dyn RemoteFileCopier,

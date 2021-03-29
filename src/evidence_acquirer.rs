@@ -46,11 +46,13 @@ impl<'a> EvidenceAcquirer<'a> {
     }
 
     pub fn local(
+        username: String,
         store_directory: &'a Path,
+        temp_storage: PathBuf,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new(
             store_directory,
-            Box::new(Local::new()),
+            Box::new(Local::new(username, temp_storage)),
         )
     }
 

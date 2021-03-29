@@ -31,6 +31,8 @@ impl FileCopier for Cmd {
             "/y".to_string(),
             "/i".to_string(),
             "/c".to_string(),
+            "/H".to_string(),
+            "/S".to_string(),
             source.to_string_lossy().to_string(),
             target.to_string_lossy().to_string(),
         ];
@@ -80,6 +82,8 @@ impl FileCopier for RemoteCmd<'_> {
                     "/y".to_string(),
                     "/i".to_string(),
                     "/c".to_string(),
+                    "/H".to_string(),
+                    "/S".to_string(),
                     source.to_string_lossy().to_string(),
                     target.to_string_lossy().to_string(),
                 ],
@@ -192,9 +196,12 @@ pub fn copy_from_remote_wildcards<F>(
             )
             .for_each(|item| {
                 let src = dir.join(item).join(&rem);
-                debug!("Copying wildcarded path {} to {}", src.display(), target.display());
-                if copy_fn(&src, target).is_err() {
-                    error!("Error remote {} copying from {} to {}", connector.computer().address, src.display(), target.display())
+                let trg = target.join(item);
+                connector.mkdir(&trg);
+
+                debug!("Copying wildcarded path {} to {}", src.display(), trg.display());
+                if copy_fn(&src, &trg).is_err() {
+                    error!("Error remote {} copying from {} to {}", connector.computer().address, src.display(), trg.display())
                 }
             });
         Ok(())

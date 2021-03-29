@@ -1,6 +1,6 @@
 use crate::process_runner::create_report_path;
 use std::path::Path;
-use crate::remote::{Connector, Compression, CompressCopier, RemoteFileCopier, Command};
+use crate::remote::{Connector, Compression, SevenZipCompressCopier, RemoteFileCopier, Command};
 use std::time::Duration;
 use std::thread;
 
@@ -64,8 +64,8 @@ impl<'a> LargeEvidenceAcquirer<'a> {
         }
         thread::sleep(Duration::from_millis(10_000));
 
-        let _compression_split_copier = CompressCopier::new(self.connector, true, self.compress_timeout.clone(), true);
-        let _compression_copier = CompressCopier::new(self.connector, false, self.compress_timeout.clone(), true);
+        let _compression_split_copier = SevenZipCompressCopier::new(self.connector, true, self.compress_timeout.clone(), true);
+        let _compression_copier = SevenZipCompressCopier::new(self.connector, false, self.compress_timeout.clone(), true);
         let copier = match self.compression {
             Compression::No => self.connector.copier(),
             Compression::Yes => &_compression_copier as &dyn RemoteFileCopier,

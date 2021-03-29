@@ -60,9 +60,17 @@ pub struct Opts {
     short = "s",
     long = "search",
     help = "Optional: File with files names to be searched on a remote computer. \
-    File names support also `*` and `?` wildcards on file names (but not yet parent directories)."
+    File names support also `*` and `?` wildcards on file names (but only single * is allowed yet \
+    in parent directories). When placing here value 'EMBEDDED' then it will download the paths \
+    declared in 'src/embedded_search_list.rs'."
     )]
     pub search_files_path: Option<String>,
+
+    #[clap(
+    long = "no-predefined-search",
+    help = "Disables predefined acquisition. It is equal to --no-evidence-search --no-registry-search --no-events-search"
+    )]
+    pub disable_predefined_download: bool,
 
     #[clap(
     long = "no-evidence-search",
@@ -75,6 +83,7 @@ pub struct Opts {
     help = "Disables target registry acquisition."
     )]
     pub disable_registry_download: bool,
+
 
     #[clap(
     long = "no-events-search",
@@ -126,6 +135,12 @@ pub struct Opts {
     help = "Acquire evidence from a remote Linux machine using SSH. Requires both plink.exe and pscp.exe in the current directory or in the path."
     )]
     pub ssh: bool,
+
+    #[clap(
+    long = "local",
+    help = "Acquire evidence from a local Windows machine."
+    )]
+    pub local: bool,
 
     #[clap(
     short = "m",

@@ -1,25 +1,30 @@
-use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, Command};
+use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, Command, DEFAULT_REMOTE_PATH_STORAGE, copy_from_remote_wildcards, Cmd};
 use std::path::{Path, PathBuf};
 use std::{io, fs};
 use std::time::Duration;
 use fs_extra::dir::CopyOptions;
 use std::io::ErrorKind;
-use crate::remote::constants::REMOTE_PATH_STORAGE;
 
 pub struct Local {
-    localhost: Computer
+    localhost: Computer,
+    temp_storage: PathBuf,
 }
 
 impl Local {
-    pub fn new() -> Local {
+    pub fn new(username: String, temp_storage: PathBuf) -> Local {
         Local {
             localhost: Computer {
                 address: String::from("127.0.0.1"),
-                username: String::new(),
+                username,
                 password: None,
                 domain: None,
-            }
+            },
+            temp_storage
         }
+    }
+
+    pub fn new_default(username: String) -> Local {
+        Local::new(username, PathBuf::from(DEFAULT_REMOTE_PATH_STORAGE))
     }
 }
 
@@ -37,7 +42,7 @@ impl Connector for Local {
     }
 
     fn remote_temp_storage(&self) -> &Path {
-        Path::new(REMOTE_PATH_STORAGE)
+        self.temp_storage.as_path()
     }
 
     fn connect_and_run_local_program(
@@ -67,31 +72,11 @@ impl Connector for Local {
 
 impl FileCopier for Local {
     fn copy_file(&self, source: &Path, target: &Path) -> io::Result<()> {
-        if source.is_file() {
-            let target = if target.is_file() {
-                target.to_path_buf()
-            } else {
-                target.join(source.file_name().unwrap())
-            };
-            fs::copy(source, &target)?;
-        } else {
-            if !target.exists() {
-                fs::create_dir_all(target)?;
-            }
-            let mut options = CopyOptions::new();
-            options.copy_inside = true;
-            options.overwrite = true;
-            fs_extra::dir::copy(source, target, &options).map_err(|err| io::Error::new(ErrorKind::Other, err))?;
-        }
-        Ok(())
+        Cmd{}.copy_file(source, target)
     }
 
     fn delete_file(&self, target: &Path) -> io::Result<()> {
-        if target.is_file() {
-            fs::remove_file(target)
-        } else {
-            fs::remove_dir_all(target)
-        }
+        Cmd{}.delete_file(target)
     }
 
     fn method_name(&self) -> &'static str {
@@ -110,5 +95,14 @@ impl RemoteFileCopier for Local {
 
     fn path_to_remote_form(&self, path: &Path) -> PathBuf {
         path.to_path_buf()
+    }
+
+    fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
+        copy_from_remote_wildcards(
+            source,
+            target,
+            self,
+            |s, t| self.copier_impl().copy_file(&self.path_to_remote_form(s), t),
+        )
     }
 }
