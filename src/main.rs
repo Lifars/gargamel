@@ -11,7 +11,7 @@ use crate::arg_parser::Opts;
 extern crate log;
 extern crate simplelog;
 
-use clap::derive::Clap;
+use clap::Clap;
 use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::{Path, PathBuf};
 use crate::remote::{Computer, Rdp, Wmi, Ssh, RemoteFileCopier, ReDownloader, PsExec, PsRemote, CompressCopierOwned, Local};
@@ -37,6 +37,7 @@ mod events_acquirer;
 mod file_acquirer;
 mod registry_acquirer;
 mod command_runner;
+mod kape_handler;
 
 fn setup_logger() {
     CombinedLogger::init(
@@ -52,8 +53,19 @@ fn main() -> Result<(), io::Error> {
     print_logo();
 
     let opts: Opts = Opts::parse();
+    
     create_dir_all(&opts.local_store_directory)?;
     debug!("Parsing remote computers.");
+
+    // just the parsing part
+    if let Some(kape_path) = &opts.kape_config_path {
+        match kape_handler::convert_kape_config(kape_path) {
+            Ok(()) => println!("Sucessfull parsed all kape configs!"),
+            Err(e) => error!("Parsing kape configs {}", e)
+        }
+        return Ok(());
+    };
+
     let remote_computers: Vec<Computer> = opts.clone().into();
     trace!("Will connect to {} computers", remote_computers.len());
     let opts = Opts {
