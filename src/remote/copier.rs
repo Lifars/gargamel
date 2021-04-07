@@ -153,7 +153,7 @@ pub trait RemoteFileCopier {
     }
 }
 
-pub fn copy_from_remote_wildcards<F>(
+pub fn copy_from_local_wildcards<F>(
     source: &Path,
     target: &Path,
     connector: &dyn Connector,
@@ -202,6 +202,58 @@ pub fn copy_from_remote_wildcards<F>(
                 debug!("Copying wildcarded path {} to {}", src.display(), trg.display());
                 if copy_fn(&src, &trg).is_err() {
                     error!("Error remote {} copying from {} to {}", connector.computer().address, src.display(), trg.display())
+                }
+            });
+        Ok(())
+    }
+}
+
+pub fn copy_from_remote_wildcards<F>(
+    source: &Path,
+    target: &Path,
+    connector: &dyn Connector,
+    copy_fn: F,
+) -> io::Result<()>
+    where F: Fn(&Path, &Path) -> io::Result<()> {
+    trace!("Copier supports wildcards");
+    let dir = source
+        .components()
+        .take_while(|item| !item.as_os_str().to_str().unwrap_or_default().contains("*"))
+        .map(|item| item.as_os_str())
+        .collect::<PathBuf>();
+
+    let wildcarded = source
+        .components()
+        .skip_while(|item| !item.as_os_str().to_str().unwrap_or_default().contains("*"))
+        .take(1)
+        .collect::<Vec<Component>>()
+        .get(0)
+        .map(|it| it.as_os_str().to_string_lossy());
+
+    let rem = source
+        .components()
+        .skip_while(|item| !item.as_os_str().to_str().unwrap_or_default().contains("*"))
+        .skip(1)
+        .map(|item| item.as_os_str())
+        .collect::<PathBuf>();
+
+    if dir.components().count() >= source.components().count() - 1 {
+        copy_fn(source, target)
+    } else {
+        let wildcarded = wildcarded.unwrap();
+        connector
+            .list_dirs(&dir, &temp_dir())
+            .iter()
+            .filter(|path_item| {
+                trace!("Matching {} with {}", &wildcarded, path_item);
+                WildMatch::new(&wildcarded).matches(path_item)
+            }
+            )
+            .for_each(|item| {
+                let src = dir.join(item).join(&rem);
+                debug!("Copying wildcarded path {} to {}", src.display(), target.display());
+                if copy_fn(&src, target).is_err() {
+                    error!("Error remote {} copying from {} to {}", connector.computer().address, src.display(), target.display())
                 }
             });
         Ok(())

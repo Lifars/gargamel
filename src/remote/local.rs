@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, Command, DEFAULT_REMOTE_PATH_STORAGE, copy_from_remote_wildcards, Cmd};
+use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, Command, DEFAULT_REMOTE_PATH_STORAGE, copy_from_remote_wildcards, Cmd, copy_from_local_wildcards};
 use std::path::{Path, PathBuf};
 use std::{io, fs};
 use std::time::Duration;
@@ -98,11 +98,11 @@ impl RemoteFileCopier for Local {
     }
 
     fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
-        copy_from_remote_wildcards(
+        copy_from_local_wildcards(
             source,
             target,
             self,
-            |s, t| self.copier_impl().copy_file(&self.path_to_remote_form(s), t),
+            |s, t| self.copier_impl().copy_file(s, t),
         )
     }
 }

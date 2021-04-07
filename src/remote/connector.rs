@@ -380,7 +380,7 @@ pub trait Connector {
                 "icacls.exe".to_string(),
                 path.to_string_lossy().to_string(),
                 "/grant".to_string(),
-                format!("{}:F", self.computer().username)
+                format!("{}:F", self.computer().domain_username())
             ],
             report_store_directory: None,
             report_filename_prefix: "GRANT_VSI",
