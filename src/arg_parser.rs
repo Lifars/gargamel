@@ -1,7 +1,7 @@
 use clap::Clap;
 
 #[derive(Clap, Clone)]
-#[clap(version = "1.0", author = "LIFARS LLC")]
+#[clap(version = "1.1", author = "LIFARS LLC")]
 pub struct Opts {
     #[clap(
     short = "c",
