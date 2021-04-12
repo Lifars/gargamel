@@ -7,7 +7,7 @@ pub struct Opts {
     short = "c",
     long = "computer",
     default_value = "127.0.0.1",
-    help = "Remote computer address/name. It may be also a path to a file with list of addresses/names (one per line)."
+    help = "Remote computer address/name. It may be also a path to a file with list of addresses/names (one per line in form 'address domain\\user password')."
     )]
     pub computer: String,
 
