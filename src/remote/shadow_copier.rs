@@ -1,15 +1,10 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, SevenZipCompressCopier, RemoteFileCopier, Compression, Local, FileCopier};
-use std::path::{Path, PathBuf, StripPrefixError};
-use std::{io, thread, fs};
+use crate::remote::{Connector, Computer, Command, RemoteFileCopier, FileCopier};
+use std::path::{Path, PathBuf};
+use std::{io, fs};
 use std::time::Duration;
-use crate::process_runner::{create_report_path, run_process_blocking};
-use std::io::{ErrorKind, BufRead};
+use std::io::ErrorKind;
 use uuid::Uuid;
 use rev_lines::RevLines;
-use crate::remote::Compression::No;
-use std::cell::RefCell;
-use std::ops::Deref;
-use std::fmt::format;
 
 
 pub struct ShadowCopier<'a> {
@@ -58,7 +53,7 @@ impl<'a> ShadowCopier<'a> {
             create_vss_command,
             timeout.clone(),
         ) {
-            error!("{}", io::Error::new(ErrorKind::InvalidData, "No output from VSS shadow create"));
+            error!("{}", err);
             return PathBuf::from("C:\\");
         }
         let list_vss_command = Command {
@@ -132,7 +127,7 @@ impl<'a> ShadowCopier<'a> {
             link_vss_command,
             timeout.clone(),
         ) {
-            error!("{}", io::Error::new(ErrorKind::InvalidData, "No output from VSS shadow create"));
+            error!("{}", err);
             return PathBuf::from("C:\\");
         }
         vss_link_path

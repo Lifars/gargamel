@@ -1,9 +1,7 @@
-use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, Command, DEFAULT_REMOTE_PATH_STORAGE, copy_from_remote_wildcards, Cmd, copy_from_local_wildcards};
+use crate::remote::{Connector, Computer, FileCopier, RemoteFileCopier, Command, DEFAULT_REMOTE_PATH_STORAGE, Cmd, copy_from_local_wildcards};
 use std::path::{Path, PathBuf};
-use std::{io, fs};
+use std::io;
 use std::time::Duration;
-use fs_extra::dir::CopyOptions;
-use std::io::ErrorKind;
 
 pub struct Local {
     localhost: Computer,

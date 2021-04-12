@@ -4,7 +4,6 @@ use std::{io, thread};
 use std::time::Duration;
 use std::io::{Error};
 use uuid::Uuid;
-use crate::remote::Compression::No;
 use crate::utils::path_join_to_string_ntfs;
 
 
@@ -111,37 +110,6 @@ impl<'a> Archiver for SevenZipArchiver<'a> {
             command,
             self.timeout.clone(),
         ).map(|_| ())
-    }
-}
-
-pub struct SevenZipArchiverOwned {
-    connector: Box<dyn Connector>,
-    timeout: Option<Duration>,
-}
-
-impl SevenZipArchiverOwned {
-    pub fn remote(
-        connector: Box<dyn Connector>,
-        timeout: Option<Duration>,
-    ) -> SevenZipArchiverOwned {
-        SevenZipArchiverOwned {
-            connector,
-            timeout,
-        }
-    }
-
-    pub fn local(local: Box<Local>) -> SevenZipArchiverOwned {
-        SevenZipArchiverOwned::remote(local, None)
-    }
-
-    pub fn compress(&self, path: &Path, split: bool) -> PathBuf {
-        SevenZipArchiver { connector: self.connector.as_ref(), timeout: self.timeout.clone() }
-            .compress(path, split)
-    }
-
-    pub fn uncompress(&self, path: &Path) -> io::Result<()> {
-        SevenZipArchiver { connector: self.connector.as_ref(), timeout: self.timeout.clone() }
-            .uncompress(path)
     }
 }
 
@@ -373,60 +341,5 @@ impl SevenZipCompressCopier<'_> {
                 }
             }
         }
-    }
-}
-
-pub struct CompressCopierOwned {
-    connector: Box<dyn Connector>,
-    split: bool,
-    timeout: Option<Duration>,
-    uncompress_downloaded: bool,
-}
-
-impl CompressCopierOwned {
-    pub fn new(
-        connector: Box<dyn Connector>,
-        split: bool,
-        timeout: Option<Duration>,
-        uncompress_downloaded: bool,
-    ) -> CompressCopierOwned {
-        CompressCopierOwned {
-            connector,
-            split,
-            timeout,
-            uncompress_downloaded,
-        }
-    }
-}
-
-impl RemoteFileCopier for CompressCopierOwned {
-    fn remote_computer(&self) -> &Computer {
-        self.connector.computer()
-    }
-
-    fn copier_impl(&self) -> &dyn FileCopier {
-        self.connector.copier().copier_impl()
-    }
-
-    fn path_to_remote_form(&self, path: &Path) -> PathBuf {
-        self.connector.copier().path_to_remote_form(path)
-    }
-
-    fn copy_to_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
-        SevenZipCompressCopier::new(self.connector.as_ref(), self.split, self.timeout.clone(), self.uncompress_downloaded)
-            .copy_to_remote(source, target)
-    }
-
-    fn delete_remote_file(&self, target: &Path) -> io::Result<()> {
-        self.connector.copier().delete_remote_file(target)
-    }
-
-    fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {
-        SevenZipCompressCopier::new(self.connector.as_ref(), self.split, self.timeout.clone(), self.uncompress_downloaded)
-            .copy_from_remote(source, target)
-    }
-
-    fn method_name(&self) -> &'static str {
-        self.connector.connect_method_name()
     }
 }

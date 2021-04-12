@@ -4,7 +4,6 @@ use std::io;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use crate::embedded_search_list::embedded_search_list;
-use uuid::Uuid;
 
 pub fn download_files(file_list: &str,
                       local_store_directory: &Path,

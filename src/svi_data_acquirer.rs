@@ -1,11 +1,7 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, SevenZipCompressCopier, RemoteFileCopier, Compression, Local, RevShareConnector};
+use crate::remote::{Connector, Computer, PsExec, PsRemote, Rdp, Wmi, SevenZipCompressCopier, RemoteFileCopier, Compression, Local, RevShareConnector};
 use std::path::{Path, PathBuf};
-use std::{io, thread, fs};
+use std::{io, thread};
 use std::time::Duration;
-use crate::process_runner::create_report_path;
-use std::io::{ErrorKind, BufRead};
-use uuid::Uuid;
-use rev_lines::RevLines;
 
 
 pub struct SystemVolumeInformationAcquirer<'a> {
@@ -38,7 +34,7 @@ impl<'a> SystemVolumeInformationAcquirer<'a> {
     pub fn local(
         username: String,
         local_store_directory: &'a Path,
-        temp_storage: PathBuf
+        temp_storage: PathBuf,
     ) -> SystemVolumeInformationAcquirer<'a> {
         SystemVolumeInformationAcquirer {
             local_store_directory,
@@ -123,8 +119,6 @@ impl<'a> SystemVolumeInformationAcquirer<'a> {
             compression: if no_7zip { Compression::No } else { Compression::YesSplit },
         }
     }
-
-
 
 
     pub fn download_data(

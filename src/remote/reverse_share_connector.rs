@@ -1,4 +1,4 @@
-use crate::remote::{Connector, Computer, Command, RemoteFileCopier, Cmd, WindowsRemoteFileHandler, FileCopier, copy_from_remote_wildcards, PsExec, GARGAMEL_SHARED_FOLDER_NAME, RemoteCmd};
+use crate::remote::{Connector, Computer, Command, RemoteFileCopier, FileCopier, GARGAMEL_SHARED_FOLDER_NAME, RemoteCmd};
 use std::time::Duration;
 use std::io::Error;
 use std::path::{PathBuf, Path};
@@ -20,7 +20,7 @@ impl RevShareConnector {
     fn open_connection(
         &self
     ) {
-        let mut args = vec![
+        let args = vec![
             "share".to_string(),
             format!("{}=C:", GARGAMEL_SHARED_FOLDER_NAME),
             "/GRANT:Everyone,FULL".to_string()

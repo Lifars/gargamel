@@ -14,7 +14,7 @@ extern crate simplelog;
 use clap::derive::Clap;
 use crate::evidence_acquirer::EvidenceAcquirer;
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Rdp, Wmi, Ssh, RemoteFileCopier, ReDownloader, PsExec, PsRemote, CompressCopierOwned, Local, Command, Connector, RevShareConnector, FileCopier, SevenZipCompressCopier, ShadowCopier};
+use crate::remote::{Computer, Rdp, Wmi, Ssh, RemoteFileCopier, ReDownloader, PsExec, PsRemote, Local, Connector, RevShareConnector, SevenZipCompressCopier, ShadowCopier};
 use crate::memory_acquirer::MemoryAcquirer;
 use crate::command_runner::CommandRunner;
 use crate::file_acquirer::download_files;
@@ -23,7 +23,6 @@ use std::time::Duration;
 use crate::events_acquirer::EventsAcquirer;
 use rayon::prelude::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
-use crate::remote::Compression::No;
 use crate::svi_data_acquirer::SystemVolumeInformationAcquirer;
 
 mod process_runner;
@@ -200,7 +199,6 @@ fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(),
                 local,
                 opts.reverse_share,
             );
-            let timeout = Some(Duration::from_secs(opts.timeout));
             for connector in connectors.into_iter() {
                 let _compress_copier = SevenZipCompressCopier::new(connector.as_ref(), false, None, false);
                 let mut _shadow_copier = ShadowCopier::new(connector.as_ref(), local_store_directory, None);
