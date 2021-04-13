@@ -4,6 +4,7 @@ use std::io;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use crate::embedded_search_list::embedded_search_list;
+use crate::kape_handler;
 
 pub fn download_files(file_list: &str,
                       local_store_directory: &Path,
@@ -31,19 +32,33 @@ pub fn download_files_from_embedded(local_store_directory: &Path,
     }
     Ok(())
 }
+
 pub fn download_files_from_path(file_list: &Path,
                                 local_store_directory: &Path,
                                 downloader: &dyn RemoteFileCopier,
                                 separate_stores: bool
 ) -> io::Result<()> {
     let input_file = File::open(file_list)?;
+    let mut tkapes = Vec::<kape_handler::TKapeEntry>::new();
+
     let local_store_directory = dunce::canonicalize(local_store_directory)
         .expect(&format!("Cannot canonicalize {}", local_store_directory.display()));
+
     for path_to_find in BufReader::new(input_file).lines() {
         if path_to_find.is_err() {
             warn!("Cannot read line in {}", file_list.display());
         }
+
         let path_to_find = path_to_find.unwrap();
+        if path_to_find.ends_with(".mkape") {
+
+            match kape_handler::parse_tkape(Path::new(&path_to_find)) {
+                Ok(tkape) => tkapes.push(tkape),
+                _ => println!("Error parsing {}", path_to_find)
+            };
+            continue;
+        }
+
         let _ = download_file(&path_to_find, &local_store_directory, downloader, separate_stores);
     }
     Ok(())

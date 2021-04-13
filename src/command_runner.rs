@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::fs::File;
 use crate::command_utils::parse_command;
 use std::time::Duration;
+use crate::kape_handler;
 
 pub struct CommandRunner<'a> {
     local_store_directory: &'a Path,
@@ -101,9 +102,20 @@ impl<'a> CommandRunner<'a> {
                 return;
             }
         };
+
         let reader = std::io::BufReader::new(file);
         use std::io::BufRead;
-        for one_command in reader.lines().filter_map(|item| item.ok()) {
+        let lines = reader.lines().filter_map(|item| item.ok()).collect::<Vec::<String>>();
+        let tkapes = lines.iter().filter(|item| item.ends_with(".mkape"))
+        .flat_map(|item|
+            match kape_handler::parse_mkape(Path::new(&item)) {
+                Ok(k) => k,
+                _ => Vec::<kape_handler::MKapeEntry>::new()
+            }.into_iter());
+
+
+        let parsed_commands = lines.clone().into_iter().filter(|item| !item.ends_with(".mkape")).chain(tkapes.map(|mkape| format!("{} {}", mkape.executable, mkape.commad_line)));
+        for one_command in parsed_commands {
             if one_command.starts_with("#") {
                 continue;
             }

@@ -33,8 +33,7 @@ pub struct JSONTarget {
     pub recursive : bool,
 }
 
-fn parse_mkape(path : &Path) -> std::result::Result<Vec<MKapeEntry>, io::Error> {
-    println!("Parsing {}", path.display());
+pub fn parse_mkape(path : &Path) -> std::result::Result<Vec<MKapeEntry>, io::Error> {
 
     let file = File::open(path)?;
     let lines = io::BufReader::new(file).lines().collect::<Result<_, _>>().unwrap();
@@ -58,7 +57,6 @@ fn parse_mkape(path : &Path) -> std::result::Result<Vec<MKapeEntry>, io::Error> 
                                 match subvarr {
                                     KapePair::Single(name, value) => {
                                         let lower_name = name.to_lowercase();
-
                                         match lower_name.as_ref() {
                                             "executable" => { processor.executable = value.to_string() },
                                             "commandline" => { processor.commad_line = value.to_string() },
@@ -196,7 +194,7 @@ fn parse_config(index : usize, mut level : usize, current_pair : &mut Vec<KapePa
     return lines.len();
 }
 
-fn parse_tkape(path : &Path) -> std::result::Result<TKapeEntry, io::Error> {
+pub fn parse_tkape(path : &Path) -> std::result::Result<TKapeEntry, io::Error> {
     println!("Parsing {}", path.display());
 
     let file = File::open(path)?;
