@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Connector, PsExec, PsRemote, Rdp, Wmi, Compression, Local};
+use crate::remote::{Computer, Connector, PsExec, PsRemote, Rdp, Wmi, Compression, Local, RevShareConnector};
 use std::time::Duration;
 use crate::large_evidence_acquirer::LargeEvidenceAcquirer;
 
@@ -61,21 +61,27 @@ impl<'a> RegistryAcquirer<'a> {
         store_directory: &'a Path,
         computer: Computer,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>,
+        reverse: bool,
     ) -> RegistryAcquirer {
+        let connector = Box::new(PsExec::psexec32(computer, remote_temp_storage, custom_share_folder));
         RegistryAcquirer::new(
             store_directory,
-            Box::new(PsExec::psexec32(computer, remote_temp_storage)),
+            if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
             None,
             if no_7zip { Compression::No } else { Compression::Yes },
         )
     }
 
     pub fn local(
-        store_directory: &'a Path) -> RegistryAcquirer {
+        username: String,
+        store_directory: &'a Path,
+        temp_storage: PathBuf
+    ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
-            Box::new(Local::new()),
+            Box::new(Local::new(username, temp_storage)),
             None,
             Compression::No,
         )
@@ -85,11 +91,14 @@ impl<'a> RegistryAcquirer<'a> {
         store_directory: &'a Path,
         computer: Computer,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>,
+        reverse: bool,
     ) -> RegistryAcquirer {
+        let connector = Box::new(PsExec::psexec64(computer, remote_temp_storage, custom_share_folder));
         RegistryAcquirer::new(
             store_directory,
-            Box::new(PsExec::psexec64(computer, remote_temp_storage)),
+            if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
             None,
             if no_7zip { Compression::No } else { Compression::Yes },
         )
@@ -99,11 +108,14 @@ impl<'a> RegistryAcquirer<'a> {
         store_directory: &'a Path,
         computer: Computer,
         _no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>,
+        reverse: bool,
     ) -> RegistryAcquirer {
+        let connector = Box::new(PsRemote::new(computer, remote_temp_storage, custom_share_folder));
         RegistryAcquirer::new(
             store_directory,
-            Box::new(PsRemote::new(computer, remote_temp_storage)),
+            if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
             None,
             Compression::No,
         )
@@ -114,13 +126,13 @@ impl<'a> RegistryAcquirer<'a> {
         computer: Computer,
         compress_timeout: Duration,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
     ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
             Box::new(Wmi { computer, remote_temp_storage }),
             Some(compress_timeout),
-            if no_7zip { Compression::No } else { Compression::YesSplit }
+            if no_7zip { Compression::No } else { Compression::YesSplit },
         )
     }
 
@@ -130,25 +142,25 @@ impl<'a> RegistryAcquirer<'a> {
         compress_timeout: Duration,
         nla: bool,
         no_7zip: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
     ) -> RegistryAcquirer {
         RegistryAcquirer::new(
             store_directory,
             Box::new(Rdp { computer, nla, remote_temp_storage }),
             Some(compress_timeout),
-            if no_7zip { Compression::No } else { Compression::YesSplit }
+            if no_7zip { Compression::No } else { Compression::YesSplit },
         )
     }
 
     pub fn acquire(&self) {
         let command = &self.registry_hklm_command;
-        let lea = LargeEvidenceAcquirer{
+        let lea = LargeEvidenceAcquirer {
             store_directory: self.store_directory,
             connector: self.connector.as_ref(),
             compress_timeout: self.compress_timeout,
             compression: self.compression,
             report_extension: "txt",
-            overwrite_switch: Some("/y")
+            overwrite_switch: Some("/y"),
         };
         lea.run(
             command,

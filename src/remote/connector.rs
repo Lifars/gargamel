@@ -1,13 +1,14 @@
 use std::io::{Result, BufReader, BufRead};
 use crate::process_runner::{run_process_blocking, create_report_path, run_process_blocking_timed};
 use std::{iter, thread, io};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use crate::arg_parser::Opts;
 use std::time::Duration;
 use crate::remote::{RemoteFileCopier, Local};
 use std::fs::File;
 use uuid::Uuid;
 use rpassword::read_password;
+use username::get_user_name;
 
 #[derive(Clone)]
 pub struct Computer {
@@ -37,10 +38,7 @@ pub struct Command<'a> {
 
 impl From<Opts> for Computer {
     fn from(opts: Opts) -> Self {
-        if opts.computer == "127.0.0.1" || opts.computer == "localhost" {
-            return Local::new().computer().clone();
-        }
-
+        let local_mode = opts.local || opts.computer == "127.0.0.1" || opts.computer == "localhost";
         let (domain, username) = match &opts.user {
             Some(user) => if user.is_empty() {
                 (None, "".to_string())
@@ -48,16 +46,23 @@ impl From<Opts> for Computer {
                 (opts.domain, user.clone())
             },
             None => {
-                println!("Domain (optional): ");
-                let mut domain = String::new();
-                let _ = io::stdin().read_line(&mut domain);
+                if local_mode {
+                    (None, get_user_name().expect("Non unicode character in this username"))
+                }else {
+                    println!("Domain (optional): ");
+                    let mut domain = String::new();
+                    let _ = io::stdin().read_line(&mut domain);
 
-                println!("Username: ");
-                let mut user = String::new();
-                io::stdin().read_line(&mut user).ok();
-                (if domain.trim().is_empty() { None } else { Some(domain) }, user)
+                    println!("Username: ");
+                    let mut user = String::new();
+                    io::stdin().read_line(&mut user).ok();
+                    (if domain.trim().is_empty() { None } else { Some(domain) }, user)
+                }
             }
         };
+        if local_mode {
+            return Local::new(username, PathBuf::from(opts.remote_store_directory)).computer().clone();
+        }
         let password = match &opts.password {
             Some(password) => if password.is_empty() {
                 None
@@ -192,11 +197,28 @@ pub trait Connector {
 
     fn remote_temp_storage(&self) -> &Path;
 
+    fn mkdir(&self, path: &Path) {
+        let command = Command::new(
+            vec![
+                "cmd.exe".to_string(),
+                "/c".to_string(),
+                "md".to_string(),
+                path.to_str().unwrap_or_default().to_string(),
+            ],
+            None,
+            "",
+            true,
+        );
+        if let Err(err) = self.connect_and_run_command(command, Some(Duration::from_secs(10))) {
+            error!("{}", err);
+        }
+    }
+
     fn connect_and_run_local_program_in_current_directory(
         &self,
         command_to_run: Command<'_>,
         timeout: Option<Duration>,
-    ) -> Result<()> {
+    ) -> Result<Option<PathBuf>> {
         let mut command = command_to_run.command;
         command[0] = std::env::current_dir().unwrap()
             .join(Path::new(&command[0]).file_name().unwrap())
@@ -215,7 +237,7 @@ pub trait Connector {
         &self,
         command_to_run: Command<'_>,
         timeout: Option<Duration>,
-    ) -> Result<()> {
+    ) -> Result<Option<PathBuf>> {
         let local_program_path = Path::new(command_to_run.command.first().unwrap());
         let remote_storage = self.remote_temp_storage();
         let copier = self.copier();
@@ -232,16 +254,17 @@ pub trait Connector {
             command,
             ..command_to_run
         };
-        self.connect_and_run_command(command_to_run, timeout)?;
+        let result = self.connect_and_run_command(command_to_run, timeout)?;
         thread::sleep(Duration::from_millis(10_000));
-        copier.delete_remote_file(&remote_program_path)
+        copier.delete_remote_file(&remote_program_path)?;
+        Ok(result)
     }
 
     fn connect_and_run_command(
         &self,
         command_to_run: Command<'_>,
         timeout: Option<Duration>,
-    ) -> Result<()> {
+    ) -> Result<Option<PathBuf>> {
         debug!("Trying to run command {:?} on {}",
                command_to_run.command,
                &self.computer().address
@@ -262,7 +285,7 @@ pub trait Connector {
 
         let processed_command = self.prepare_command(
             command_to_run.command,
-            output_file_path,
+            output_file_path.as_deref(),
             command_to_run.elevated,
         );
 
@@ -279,7 +302,8 @@ pub trait Connector {
                     &prepared_command,
                     timeout.clone(),
                 ),
-        }
+        }?;
+        Ok(output_file_path.map(|it| PathBuf::from(it)))
     }
 
     fn prepare_remote_process(&self,
@@ -297,7 +321,7 @@ pub trait Connector {
 
     fn prepare_command(&self,
                        command: Vec<String>,
-                       output_file_path: Option<String>,
+                       output_file_path: Option<&str>,
                        elevated: bool,
     ) -> Vec<String>;
 
@@ -351,5 +375,55 @@ pub trait Connector {
             error!("{}", err);
         }
         result
+    }
+
+    fn acquire_perms(&self, path: &Path) {
+        debug!("Acquiring ownership");
+        let grant_svi = Command {
+            command: vec![
+                "cmd.exe".to_string(),
+                "/c".to_string(),
+                "icacls.exe".to_string(),
+                path.to_string_lossy().to_string(),
+                "/grant".to_string(),
+                format!("{}:F", self.computer().domain_username())
+            ],
+            report_store_directory: None,
+            report_filename_prefix: "GRANT_VSI",
+            elevated: true,
+        };
+
+        if let Err(err) = self.connect_and_run_command(
+            grant_svi,
+            None,
+        ) {
+            warn!("Cannot acquire ownership: {}", err)
+        }
+        thread::sleep(Duration::from_secs(5));
+    }
+
+    fn release_perms(&self, path: &Path) {
+        thread::sleep(Duration::from_secs(5));
+        debug!("Releasing ownership");
+        let grant_svi = Command {
+            command: vec![
+                "cmd.exe".to_string(),
+                "/c".to_string(),
+                "icacls.exe".to_string(),
+                path.to_string_lossy().to_string(),
+                "/deny".to_string(),
+                format!("{}:F", self.computer().username)
+            ],
+            report_store_directory: None,
+            report_filename_prefix: "DENY_VSI",
+            elevated: true,
+        };
+
+        if let Err(err) = self.connect_and_run_command(
+            grant_svi,
+            None,
+        ) {
+            warn!("Cannot release ownership: {}", err)
+        }
     }
 }

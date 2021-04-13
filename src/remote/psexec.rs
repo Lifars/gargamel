@@ -16,30 +16,30 @@ pub const PSEXEC64_NAME: &str = "PsExec64.exe";
 pub const PSEXEC32_NAME: &str = "PsExec.exe";
 
 impl PsExec {
-    pub fn paexec(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
+    pub fn paexec(computer: Computer, remote_temp_storage: PathBuf, custom_share_folder: Option<String>) -> PsExec {
         PsExec {
             computer: computer.clone(),
-            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {}), custom_share_folder),
             psexec_name: "paexec.exe".to_string(),
             remote_temp_storage,
             ms_psexec: false,
         }
     }
 
-    pub fn psexec32(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
+    pub fn psexec32(computer: Computer, remote_temp_storage: PathBuf, custom_share_folder: Option<String>) -> PsExec {
         PsExec {
             computer: computer.clone(),
-            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {}), custom_share_folder),
             psexec_name: PSEXEC32_NAME.to_string(),
             remote_temp_storage,
             ms_psexec: true,
         }
     }
 
-    pub fn psexec64(computer: Computer, remote_temp_storage: PathBuf) -> PsExec {
+    pub fn psexec64(computer: Computer, remote_temp_storage: PathBuf, custom_share_folder: Option<String>) -> PsExec {
         PsExec {
             computer: computer.clone(),
-            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {})),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Cmd {}), custom_share_folder),
             psexec_name: PSEXEC64_NAME.to_string(),
             remote_temp_storage,
             ms_psexec: true,
@@ -67,7 +67,7 @@ impl Connector for PsExec {
     fn connect_and_run_local_program(&self,
                                      command_to_run: Command<'_>,
                                      timeout: Option<Duration>,
-    ) -> Result<(), Error> {
+    ) -> Result<Option<PathBuf>, Error> {
         let mut command = command_to_run.command;
         if self.ms_psexec {
             command.insert(0, "-accepteula".to_string());
@@ -84,7 +84,7 @@ impl Connector for PsExec {
 
     fn prepare_command(&self,
                        command: Vec<String>,
-                       output_file_path: Option<String>,
+                       output_file_path: Option<&str>,
                        elevated: bool,
     ) -> Vec<String> {
         let remote_computer = self.computer();
@@ -108,7 +108,7 @@ impl Connector for PsExec {
             None => prepared_command,
             Some(output_file_path) => {
                 prepared_command.push(">".to_string());
-                prepared_command.push(output_file_path);
+                prepared_command.push(output_file_path.to_string());
                 prepared_command
             }
         }
@@ -145,10 +145,10 @@ impl RemoteFileCopier for PsExec {
                 ],
                 report_store_directory: None,
                 report_filename_prefix: "",
-                elevated: false,
+                elevated: true,
             },
             None,
-        )
+        ).map(|_| ())
     }
 
     fn copy_from_remote(&self, source: &Path, target: &Path) -> io::Result<()> {

@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Ssh, Rdp, Wmi, Local};
+use crate::remote::{Computer, Connector, Command, PsExec, PsRemote, Ssh, Rdp, Wmi, Local, RevShareConnector};
 
 pub struct EvidenceAcquirer<'a> {
     store_directory: &'a Path,
@@ -46,47 +46,55 @@ impl<'a> EvidenceAcquirer<'a> {
     }
 
     pub fn local(
+        username: String,
         store_directory: &'a Path,
+        temp_storage: PathBuf,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new(
             store_directory,
-            Box::new(Local::new()),
+            Box::new(Local::new(username, temp_storage)),
         )
     }
 
     pub fn psexec(
         remote_computer: Computer,
         store_directory: &'a Path,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>,
+        reversed: bool,
     ) -> EvidenceAcquirer<'a> {
+        let connector = Box::new(PsExec::paexec(remote_computer, remote_temp_storage, custom_share_folder));
         EvidenceAcquirer::new(
             store_directory,
-            Box::new(PsExec::paexec(remote_computer, remote_temp_storage)),
+            if reversed { Box::new(RevShareConnector::new(connector)) } else { connector },
         )
     }
 
     pub fn psremote(
         remote_computer: Computer,
         store_directory: &'a Path,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
+        custom_share_folder: Option<String>,
+        reversed: bool,
     ) -> EvidenceAcquirer<'a> {
+        let connector = Box::new(PsRemote::new(remote_computer, remote_temp_storage, custom_share_folder));
         EvidenceAcquirer::new(
             store_directory,
-            Box::new(PsRemote::new(remote_computer, remote_temp_storage)),
+            if reversed { Box::new(RevShareConnector::new(connector)) } else { connector },
         )
     }
 
     pub fn wmi(
         remote_computer: Computer,
         store_directory: &'a Path,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new(
             store_directory,
             Box::new(Wmi {
                 computer: remote_computer,
-                remote_temp_storage
-            })
+                remote_temp_storage,
+            }),
         )
     }
 
@@ -94,15 +102,15 @@ impl<'a> EvidenceAcquirer<'a> {
         remote_computer: Computer,
         store_directory: &'a Path,
         nla: bool,
-        remote_temp_storage: PathBuf
+        remote_temp_storage: PathBuf,
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer::new(
             store_directory,
             Box::new(Rdp {
                 nla,
                 computer: remote_computer,
-                remote_temp_storage
-            })
+                remote_temp_storage,
+            }),
         )
     }
 
@@ -113,7 +121,7 @@ impl<'a> EvidenceAcquirer<'a> {
     ) -> EvidenceAcquirer<'a> {
         EvidenceAcquirer {
             store_directory,
-            connector: Box::new(Ssh{ key_file, computer: remote_computer.clone() }),
+            connector: Box::new(Ssh { key_file, computer: remote_computer.clone() }),
             firewall_state_command: Some(vec![
                 format!("echo {} | sudo -S iptables -L", remote_computer.password.unwrap_or_default()),
             ]),
@@ -144,7 +152,7 @@ impl<'a> EvidenceAcquirer<'a> {
             command.to_vec(),
             Some(&self.store_directory),
             report_filename_prefix,
-            false
+            true,
         );
 
         info!("{}: Checking {}",
@@ -160,61 +168,61 @@ impl<'a> EvidenceAcquirer<'a> {
 
     pub fn firewall_state(&self) {
         match &self.firewall_state_command {
-            None => {},
+            None => {}
             Some(command) => {
                 self.run(
                     command,
                     "firewall-status",
                 )
-            },
+            }
         }
     }
 
     pub fn network_state(&self) {
         match &self.network_state_command {
-            None => {},
+            None => {}
             Some(command) => {
                 self.run(
                     command,
                     "network-status",
                 )
-            },
+            }
         }
     }
 
     pub fn logged_users(&self) {
         match &self.logged_users_command {
-            None => {},
+            None => {}
             Some(command) => {
                 self.run(
                     command,
                     "logged-users",
                 )
-            },
+            }
         }
     }
 
     pub fn running_processes(&self) {
         match &self.running_processes_command {
-            None => {},
+            None => {}
             Some(command) => {
                 self.run(
                     command,
                     "running-processes",
                 )
-            },
+            }
         }
     }
 
     pub fn active_network_connections(&self) {
         match &self.active_network_connections_command {
-            None => {},
+            None => {}
             Some(command) => {
                 self.run(
                     command,
                     "active-network-connections",
                 )
-            },
+            }
         }
     }
 

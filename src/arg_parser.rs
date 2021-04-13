@@ -1,9 +1,9 @@
 use clap::Clap;
 
 #[derive(Clap, Clone)]
-#[clap(version = "1.0", author = "LIFARS LLC")]
+#[clap(version = "1.1", author = "LIFARS LLC")]
 pub struct Opts {
-    /// Remote computer address/name. It may be also a path to a file with list of addresses/names (one per line).
+    /// "Remote computer address/name. It may be also a path to a file with list of addresses/names (one per line in form 'address domain\\user password')."
     #[clap(
     short = 'c',
     long = "computer",
@@ -44,7 +44,7 @@ pub struct Opts {
     #[clap(
     short = 'r',
     long = "remote-storage",
-    default_value = "C:\\Users\\Public"
+    default_value = "C:\\"
     )]
     pub remote_store_directory: String,
 
@@ -55,12 +55,21 @@ pub struct Opts {
     )]
     pub custom_command_path: Option<String>,
 
-    /// Optional: File with files names to be searched on a remote computer. File names support also `*` and `?` wildcards on file names (but not yet parent directories).
+    /// Optional: File with files names to be searched on a remote computer.
+    /// File names support also `*` and `?` wildcards on file names (but only single * is allowed yet
+    /// in parent directories). When placing here value 'EMBEDDED' then it will download the paths
+    /// declared in 'src/embedded_search_list.rs'."
     #[clap(
     short = 's',
     long = "search"
     )]
     pub search_files_path: Option<String>,
+
+    /// Disables predefined acquisition. It is equal to --no-evidence-search --no-registry-search --no-events-search
+    #[clap(
+    long = "no-predefined-search"
+    )]
+    pub disable_predefined_download: bool,
 
     /// Disables acquisition of evidence that can be usually downloaded quickly (like ipconfig, firewall status etc.)
     #[clap(
@@ -129,12 +138,30 @@ pub struct Opts {
     )]
     pub ssh: bool,
 
+    /// Acquire evidence from a local Windows machine.
+    #[clap(
+    long = "local"
+    )]
+    pub local: bool,
+
     /// Optional: Memory dump of a target Windows machine.
     #[clap(
     short = 'm',
     long = "mem-image"
     )]
     pub image_memory: bool,
+
+    /// Optional: Acquire system files from shadow volume.
+    #[clap(
+    long = "shadow"
+    )]
+    pub shadow: bool,
+
+    /// Optional: Acquire .lnk files from System Volume Information
+    #[clap(
+    long = "svi"
+    )]
+    pub acquire_svi_data: bool,
 
     /// Optional: Timeout in seconds for long running operations.
     /// This option is a workaround for a bug in WMImplant.ps1 amd SharpRDP.exe where finishing of a long running operation cannot sometimes properly close the connection.
@@ -176,6 +203,17 @@ pub struct Opts {
     #[clap(
     long = "in-parallel"
     )]
-    pub par: bool
-}
+    pub par: bool,
 
+    /// Optional: Use custom shared folder.
+    #[clap(
+    long = "share"
+    )]
+    pub share: Option<String>,
+
+    /// Optional: Dangerous!. Reverse copy operations for --psexec and --psrem. By default, Gargamel creates temporary (or uses) shared folders to target's C drive. This option creates a temporary shared folder of the host's C drive and exposes it to the target.
+    #[clap(
+    long = "reverse-share"
+    )]
+    pub reverse_share: bool
+}

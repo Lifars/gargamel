@@ -1,10 +1,10 @@
-use crate::remote::{Connector, Computer, Command, PsExec, PsRemote, Rdp, Wmi, SevenZipCompressCopier, RemoteFileCopier, Compression, Local, RevShareConnector};
+use crate::remote::{Connector, Computer, PsExec, PsRemote, Rdp, Wmi, SevenZipCompressCopier, RemoteFileCopier, Compression, Local, RevShareConnector};
 use std::path::{Path, PathBuf};
 use std::{io, thread};
 use std::time::Duration;
-use crate::process_runner::create_report_path;
 
-pub struct MemoryAcquirer<'a> {
+
+pub struct SystemVolumeInformationAcquirer<'a> {
     pub local_store_directory: &'a Path,
     pub connector: Box<dyn Connector>,
     pub image_timeout: Option<Duration>,
@@ -12,7 +12,7 @@ pub struct MemoryAcquirer<'a> {
     pub compression: Compression,
 }
 
-impl<'a> MemoryAcquirer<'a> {
+impl<'a> SystemVolumeInformationAcquirer<'a> {
     pub fn psexec32(
         remote_computer: Computer,
         local_store_directory: &'a Path,
@@ -20,12 +20,12 @@ impl<'a> MemoryAcquirer<'a> {
         remote_temp_storage: PathBuf,
         custom_share_folder: Option<String>,
         reverse: bool,
-    ) -> MemoryAcquirer<'a> {
+    ) -> SystemVolumeInformationAcquirer<'a> {
         let connector = Box::new(PsExec::psexec32(remote_computer, remote_temp_storage, custom_share_folder));
-        MemoryAcquirer {
+        SystemVolumeInformationAcquirer {
             local_store_directory,
             connector: if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
-            image_timeout: None,
+            image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },
         }
@@ -35,11 +35,11 @@ impl<'a> MemoryAcquirer<'a> {
         username: String,
         local_store_directory: &'a Path,
         temp_storage: PathBuf,
-    ) -> MemoryAcquirer<'a> {
-        MemoryAcquirer {
+    ) -> SystemVolumeInformationAcquirer<'a> {
+        SystemVolumeInformationAcquirer {
             local_store_directory,
             connector: Box::new(Local::new(username, temp_storage)),
-            image_timeout: None,
+            image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: Compression::No,
         }
@@ -52,12 +52,12 @@ impl<'a> MemoryAcquirer<'a> {
         remote_temp_storage: PathBuf,
         custom_share_folder: Option<String>,
         reverse: bool,
-    ) -> MemoryAcquirer<'a> {
+    ) -> SystemVolumeInformationAcquirer<'a> {
         let connector = Box::new(PsExec::psexec64(remote_computer, remote_temp_storage, custom_share_folder));
-        MemoryAcquirer {
+        SystemVolumeInformationAcquirer {
             local_store_directory,
             connector: if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
-            image_timeout: None,
+            image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: if no_7zip { Compression::No } else { Compression::Yes },
         }
@@ -70,12 +70,12 @@ impl<'a> MemoryAcquirer<'a> {
         remote_temp_storage: PathBuf,
         custom_share_folder: Option<String>,
         reverse: bool,
-    ) -> MemoryAcquirer<'a> {
+    ) -> SystemVolumeInformationAcquirer<'a> {
         let connector = Box::new(PsRemote::new(remote_computer, remote_temp_storage, custom_share_folder));
-        MemoryAcquirer {
+        SystemVolumeInformationAcquirer {
             local_store_directory,
             connector: if reverse { Box::new(RevShareConnector::new(connector)) } else { connector },
-            image_timeout: None,
+            image_timeout: Some(Duration::from_secs(20)),
             compress_timeout: None,
             compression: Compression::No,
         }
@@ -88,8 +88,8 @@ impl<'a> MemoryAcquirer<'a> {
         compress_timeout: Duration,
         no_7zip: bool,
         remote_temp_storage: PathBuf,
-    ) -> MemoryAcquirer<'a> {
-        MemoryAcquirer {
+    ) -> SystemVolumeInformationAcquirer<'a> {
+        SystemVolumeInformationAcquirer {
             local_store_directory,
             connector: Box::new(Wmi { computer: remote_computer.clone(), remote_temp_storage }),
             image_timeout: Some(timeout),
@@ -106,8 +106,8 @@ impl<'a> MemoryAcquirer<'a> {
         compress_timeout: Duration,
         no_7zip: bool,
         remote_temp_storage: PathBuf,
-    ) -> MemoryAcquirer<'a> {
-        MemoryAcquirer {
+    ) -> SystemVolumeInformationAcquirer<'a> {
+        SystemVolumeInformationAcquirer {
             local_store_directory,
             connector: Box::new(Rdp {
                 nla,
@@ -120,37 +120,13 @@ impl<'a> MemoryAcquirer<'a> {
         }
     }
 
-    pub fn image_memory(
+
+    pub fn download_data(
         &self
     ) -> io::Result<()> {
         let local_store_directory = self.local_store_directory;
-        let winpmem = "winpmem.exe";
+        self.connector.acquire_perms(Path::new("C:\\System Volume Information"));
 
-        // let target_name = remote_storage_file(target_name.file_name().unwrap());
-        let target_name = create_report_path(
-            self.connector.computer(),
-            self.connector.remote_temp_storage(),
-            "mem-image",
-            self.connector.connect_method_name(),
-            "aff4",
-        );
-        let connection = Command {
-            command: vec![
-                winpmem.to_string(),
-                "--format".to_string(),
-                "map".to_string(),
-                "-t".to_string(),
-                "-o".to_string(),
-                target_name.to_string_lossy().to_string(),
-            ],
-            report_store_directory: None,
-            report_filename_prefix: "mem-ack-log",
-            elevated: true,
-        };
-        self.connector.connect_and_run_local_program_in_current_directory(
-            connection,
-            self.image_timeout,
-        )?;
         let _copier = self.connector.copier();
         let _compression_split_copier = SevenZipCompressCopier::new(self.connector.as_ref(), true, self.compress_timeout, false);
         let _compression_copier = SevenZipCompressCopier::new(self.connector.as_ref(), false, self.compress_timeout, false);
@@ -159,44 +135,23 @@ impl<'a> MemoryAcquirer<'a> {
             Compression::Yes => &_compression_copier as &dyn RemoteFileCopier,
             Compression::YesSplit => &_compression_split_copier as &dyn RemoteFileCopier,
         };
-        match copier.copy_from_remote(
-            &target_name,
+        let svi_path = Path::new("C:\\System Volume Information\\*.lnk");
+
+        if let Err(err) = copier.copy_from_remote(
+            &svi_path,
             &local_store_directory,
             // &self.local_store_directory.join(target_name.file_name().unwrap()),
         ) {
-            Ok(_) => {}
-            Err(err) => {
-                error!("Cannot download {} report from {} using method {} due to {}",
-                       target_name.display(),
-                       self.connector.computer().address,
-                       self.connector.connect_method_name(),
-                       err
-                )
-            }
+            error!("Cannot download {} from {} using method {} due to {}",
+                   &svi_path.display(),
+                   self.connector.computer().address,
+                   self.connector.connect_method_name(),
+                   err
+            );
         }
-        thread::sleep(Duration::from_millis(1000));
-        let winpem_path = self.connector.remote_temp_storage().join(winpmem);
-        match copier.delete_remote_file(&winpem_path) {
-            Ok(_) => {}
-            Err(err) => {
-                error!("Cannot delete remote file {} using method {} due to {}",
-                       winpem_path.display(),
-                       self.connector.connect_method_name(),
-                       err
-                )
-            }
-        };
-        thread::sleep(Duration::from_millis(1000));
-        match copier.delete_remote_file(&target_name) {
-            Ok(_) => {}
-            Err(err) => {
-                error!("Cannot delete remote file {} using method {} due to {}",
-                       target_name.display(),
-                       self.connector.connect_method_name(),
-                       err
-                )
-            }
-        };
+        thread::sleep(Duration::from_millis(20000));
+
+        self.connector.release_perms(Path::new("C:\\System Volume Information"));
         Ok(())
     }
 }

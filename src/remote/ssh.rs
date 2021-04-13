@@ -30,7 +30,7 @@ impl Connector for Ssh {
     fn connect_and_run_command(&self,
                                remote_connection: Command<'_>,
                                _timeout: Option<Duration>
-    ) -> io::Result<()> {
+    ) -> io::Result<Option<PathBuf>> {
         debug!("Trying to run command {:?} on {}",
                remote_connection.command,
                &self.computer().address
@@ -57,7 +57,7 @@ impl Connector for Ssh {
 
         let processed_command = self.prepare_command(
             remote_connection.command,
-            output_file_path,
+            output_file_path.as_deref(),
             false
         );
         let prepared_command = self.prepare_remote_process(processed_command);
@@ -65,12 +65,13 @@ impl Connector for Ssh {
             "cmd.exe",
             &prepared_echo,
             "cmd.exe",
-            &prepared_command)
+            &prepared_command)?;
+        Ok(output_file_path.map(|it| PathBuf::from(it)))
     }
 
     fn prepare_command(&self,
                        command: Vec<String>,
-                       output_file_path: Option<String>,
+                       output_file_path: Option<&str>,
                        elevated: bool,
     ) -> Vec<String> {
         let remote_computer = self.remote_computer();
@@ -105,7 +106,7 @@ impl Connector for Ssh {
             None => prepared_command,
             Some(output_file_path) => {
                 prepared_command.push(">".to_string());
-                prepared_command.push(output_file_path);
+                prepared_command.push(output_file_path.to_string());
                 prepared_command
             }
         }

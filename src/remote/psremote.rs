@@ -10,10 +10,10 @@ pub struct PsRemote {
 }
 
 impl PsRemote {
-    pub fn new(computer: Computer, remote_temp_storage: PathBuf) -> PsRemote {
+    pub fn new(computer: Computer, remote_temp_storage: PathBuf, custom_share_folder: Option<String>) -> PsRemote {
         PsRemote {
             computer: computer.clone(),
-            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Powershell {})),
+            copier_impl: WindowsRemoteFileHandler::new(computer, Box::new(Powershell {}), custom_share_folder),
             remote_temp_storage,
         }
     }
@@ -38,7 +38,7 @@ impl Connector for PsRemote {
 
     fn prepare_command(&self,
                        command: Vec<String>,
-                       output_file_path: Option<String>,
+                       output_file_path: Option<&str>,
                        _elevated: bool,
     ) -> Vec<String> {
         let remote_computer = self.computer();
@@ -70,7 +70,7 @@ impl Connector for PsRemote {
             None => prepared_command,
             Some(output_file_path) => {
                 prepared_command.push(">".to_string());
-                prepared_command.push(output_file_path);
+                prepared_command.push(output_file_path.to_string());
                 prepared_command
             }
         }
