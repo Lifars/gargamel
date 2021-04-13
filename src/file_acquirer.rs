@@ -50,7 +50,7 @@ pub fn download_files_from_path(file_list: &Path,
         }
 
         let path_to_find = path_to_find.unwrap();
-        if path_to_find.ends_with(".mkape") {
+        if path_to_find.ends_with("tkape") {
 
             match kape_handler::parse_tkape(Path::new(&path_to_find)) {
                 Ok(tkape) => tkapes.push(tkape),
