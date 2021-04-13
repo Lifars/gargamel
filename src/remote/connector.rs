@@ -8,6 +8,7 @@ use crate::remote::{RemoteFileCopier, Local};
 use std::fs::File;
 use uuid::Uuid;
 use rpassword::read_password;
+use username::get_user_name;
 
 #[derive(Clone)]
 pub struct Computer {
@@ -37,6 +38,7 @@ pub struct Command<'a> {
 
 impl From<Opts> for Computer {
     fn from(opts: Opts) -> Self {
+        let local_mode = opts.local || opts.computer == "127.0.0.1" || opts.computer == "localhost";
         let (domain, username) = match &opts.user {
             Some(user) => if user.is_empty() {
                 (None, "".to_string())
@@ -44,17 +46,21 @@ impl From<Opts> for Computer {
                 (opts.domain, user.clone())
             },
             None => {
-                println!("Domain (optional): ");
-                let mut domain = String::new();
-                let _ = io::stdin().read_line(&mut domain);
+                if local_mode {
+                    (None, get_user_name().expect("Non unicode character in this username"))
+                }else {
+                    println!("Domain (optional): ");
+                    let mut domain = String::new();
+                    let _ = io::stdin().read_line(&mut domain);
 
-                println!("Username: ");
-                let mut user = String::new();
-                io::stdin().read_line(&mut user).ok();
-                (if domain.trim().is_empty() { None } else { Some(domain) }, user)
+                    println!("Username: ");
+                    let mut user = String::new();
+                    io::stdin().read_line(&mut user).ok();
+                    (if domain.trim().is_empty() { None } else { Some(domain) }, user)
+                }
             }
         };
-        if opts.computer == "127.0.0.1" || opts.computer == "localhost" {
+        if local_mode {
             return Local::new(username, PathBuf::from(opts.remote_store_directory)).computer().clone();
         }
         let password = match &opts.password {
