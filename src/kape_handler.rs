@@ -12,7 +12,7 @@ use std::fs::File;
 #[derive(Serialize, Deserialize, Default)]
 pub struct MKapeEntry {
     pub executable : String,
-    pub commad_line : String
+    pub command_line: String
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -59,7 +59,7 @@ pub fn parse_mkape(path : &Path) -> std::result::Result<Vec<MKapeEntry>, io::Err
                                         let lower_name = name.to_lowercase();
                                         match lower_name.as_ref() {
                                             "executable" => { processor.executable = value.to_string() },
-                                            "commandline" => { processor.commad_line = value.to_string() },
+                                            "commandline" => { processor.command_line = value.to_string() },
                                             _ => {}
                                         };
                                     }
@@ -85,7 +85,7 @@ enum KapePair {
     Multiple(String, Vec<Vec<KapePair>>)
 }
 
-fn remove_leading_whitspaces(in_string: &str) -> (String, usize) {
+fn remove_leading_whitespaces(in_string: &str) -> (String, usize) {
     
     let mut leading_count = 0usize;
     let bytes = in_string.as_bytes();
@@ -136,8 +136,8 @@ fn parse_config(index : usize, mut level : usize, current_pair : &mut Vec<KapePa
                 has_group = false;
             }
 
-            let (new_key, leading_count) = remove_leading_whitspaces(&key);
-            let (new_value, _) = remove_leading_whitspaces(&value);
+            let (new_key, leading_count) = remove_leading_whitespaces(&key);
+            let (new_value, _) = remove_leading_whitespaces(&value);
             
             if leading_count < level {
                 return i;
@@ -273,7 +273,7 @@ pub fn convert_kape_config(str_path : &String) -> std::result::Result<(), io::Er
     let mut tkapes = Vec::<TKapeEntry>::new();
     let mut mkapes = Vec::<MKapeEntry>::new();
 
-    fn handle_dir(path : &Path, tkapes : &mut Vec::<TKapeEntry>, mkapes: &mut Vec::<MKapeEntry>) -> Result<(), io::Error> {
+    fn handle_dir(path : &Path, tkapes : &mut Vec::<TKapeEntry>, mkapes: &mut Vec<MKapeEntry>) -> Result<(), io::Error> {
         for entry_res in fs::read_dir(path)? {
             let entry = entry_res?;
             let i_sub_path = entry.path();
@@ -298,7 +298,6 @@ pub fn convert_kape_config(str_path : &String) -> std::result::Result<(), io::Er
                         _ => println!("Error parsing {}", sub_path.display())
                     }
                 } else if  ext == "tkape" {
-
                     match parse_tkape(&sub_path) {
                         Ok(tkape) => tkapes.push(tkape),
                         _ => println!("Error parsing {}", sub_path.display())
@@ -313,7 +312,7 @@ pub fn convert_kape_config(str_path : &String) -> std::result::Result<(), io::Er
 
     //TODO: Do something with mkapes
     for x in mkapes.iter(){
-        println!("{} {}", x.executable, x.commad_line);
+        println!("{} {}", x.executable, x.command_line);
     }
 
     let _ = fs::write("converted.json", serde_json::to_string(&tkapes).unwrap());

@@ -106,7 +106,7 @@ impl<'a> CommandRunner<'a> {
         let reader = std::io::BufReader::new(file);
         use std::io::BufRead;
         let lines = reader.lines().filter_map(|item| item.ok()).collect::<Vec::<String>>();
-        let tkapes = lines.iter().filter(|item| item.ends_with(".mkape"))
+        let mkapes = lines.iter().filter(|item| item.ends_with(".mkape"))
         .flat_map(|item|
             match kape_handler::parse_mkape(Path::new(&item)) {
                 Ok(k) => k,
@@ -114,7 +114,7 @@ impl<'a> CommandRunner<'a> {
             }.into_iter());
 
 
-        let parsed_commands = lines.clone().into_iter().filter(|item| !item.ends_with(".mkape")).chain(tkapes.map(|mkape| format!("{} {}", mkape.executable, mkape.commad_line)));
+        let parsed_commands = lines.clone().into_iter().filter(|item| !item.ends_with(".mkape")).chain(mkapes.map(|mkape| format!("{} {}", mkape.executable, mkape.command_line)));
         for one_command in parsed_commands {
             if one_command.starts_with("#") {
                 continue;

@@ -39,7 +39,6 @@ pub fn download_files_from_path(file_list: &Path,
                                 separate_stores: bool
 ) -> io::Result<()> {
     let input_file = File::open(file_list)?;
-    let mut tkapes = Vec::<kape_handler::TKapeEntry>::new();
 
     let local_store_directory = dunce::canonicalize(local_store_directory)
         .expect(&format!("Cannot canonicalize {}", local_store_directory.display()));
@@ -53,13 +52,23 @@ pub fn download_files_from_path(file_list: &Path,
         let path_to_find = path_to_find.unwrap();
         if path_to_find.ends_with("tkape") {
             match kape_handler::parse_tkape(Path::new(&path_to_find)) {
-                Ok(tkape) => tkapes.push(tkape),
+                Ok(tkape) => {
+                    for take_target in tkape.targets {
+                        if let Err(e) = download_file(&take_target.path, &local_store_directory, downloader, separate_stores) {
+                            warn!("{}", e)
+                        }
+                    }
+                },
                 _ => println!("Error parsing {}", path_to_find)
             };
-            continue;
+
+
+        }else {
+            if let Err(e) = download_file(&path_to_find, &local_store_directory, downloader, separate_stores) {
+                warn!("{}", e)
+            }
         }
 
-        let _ = download_file(&path_to_find, &local_store_directory, downloader, separate_stores);
     }
     Ok(())
 }
