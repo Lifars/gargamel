@@ -18,13 +18,6 @@ pub struct Opts {
     )]
     pub user: Option<String>,
 
-    /// Optional: Remote Windows domain.
-    #[clap(
-    short = 'd',
-    long = "domain"
-    )]
-    pub domain: Option<String>,
-
     /// Optional: Remote user password. Skipping this option will prompt for a password during start. To specify an empty password use `-p ""`.
     #[clap(
     short = 'p',
@@ -221,5 +214,5 @@ pub struct Opts {
     #[clap(
     long = "disable-log-colors"
     )]
-    pub disable_log_colors: bool
+    pub disable_log_colors: bool,
 }

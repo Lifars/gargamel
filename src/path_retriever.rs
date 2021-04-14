@@ -8,8 +8,12 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use clap::Clap;
+use std::ops::Deref;
+use std::io::{BufReader, BufRead};
+use std::fs::File;
 
 mod kape_handler;
+
 extern crate serde_json;
 
 #[derive(Clap, Clone)]
@@ -17,41 +21,48 @@ extern crate serde_json;
 pub struct Opts {
     /// Path to the output file, if not specified stdout is used
     #[clap(
-        short = 'o',
-        long = "output_file",
-        )]
+    short = 'o',
+    long = "output_file",
+    )]
     pub output: Option<String>,
 
     /// Path to the input file
     #[clap(
-        short = 'i',
-        long = "input_file",
-        default_value = "converted.json"
-        )]
-    pub input: String,
+    short = 'i',
+    long = "input_file",
+    default_value = "converted.json"
+    )]
+    pub input_tkape: Option<String>,
+
+    /// Path to the input file
+    #[clap(
+    short = 'i',
+    long = "input_file_simple",
+    default_value = ""
+    )]
+    pub input_simple: Option<String>,
 }
 
 enum MatchType {
     ExactMatch(String),
     WildcardMatch(WildMatch),
-    Anything()
+    Anything(),
 }
 
 struct Pattern {
-    components : Vec::<MatchType>,
-    file_mask : WildMatch,
-    recursive : bool
+    components: Vec<MatchType>,
+    file_mask: WildMatch,
+    recursive: bool,
 }
 
 impl Pattern {
-    pub fn new(path : &str, file_mask : &str, recursive : bool) -> Pattern {
-
+    pub fn new(path: &str, file_mask: &str, recursive: bool) -> Pattern {
         let path_copy = path.to_string().to_lowercase();
 
         let p = Path::new(&path_copy);
         let pb = p.to_path_buf();
 
-        let mut components =  Vec::<MatchType>::new();
+        let mut components = Vec::<MatchType>::new();
 
         for a in pb.iter() {
             let as_str = a.to_str().unwrap();
@@ -61,30 +72,26 @@ impl Pattern {
                 continue;
             }
 
-            if   as_str == "%user%" || as_str == "*" {
+            if as_str == "%user%" || as_str == "*" {
                 components.push(MatchType::Anything());
-            }
-            else if as_str.contains("*")  {
+            } else if as_str.contains("*") {
                 components.push(MatchType::WildcardMatch(WildMatch::new(as_str)));
-            }
-            else {
+            } else {
                 components.push(MatchType::ExactMatch(as_str.to_string()));
             }
-
         }
 
         let mut mask = file_mask;
 
         if mask.is_empty() {
-            mask = "*"; 
+            mask = "*";
         }
 
         Pattern { components: components, file_mask: WildMatch::new(mask), recursive: recursive }
     }
 
 
-
-    pub fn parent_matches(&self, path : &Vec<String>) -> bool {
+    pub fn parent_matches(&self, path: &Vec<String>) -> bool {
         if path.len() < self.components.len() {
             return false;
         }
@@ -96,8 +103,8 @@ impl Pattern {
         for (i, comp) in self.components.iter().enumerate() {
             match &comp {
                 MatchType::Anything() => continue,
-                MatchType::ExactMatch(x) => if *x != path[i] { return false },
-                MatchType::WildcardMatch(x) => if !x.matches(&path[i]) { return false },
+                MatchType::ExactMatch(x) => if *x != path[i] { return false; },
+                MatchType::WildcardMatch(x) => if !x.matches(&path[i]) { return false; },
             }
         }
 
@@ -105,7 +112,7 @@ impl Pattern {
     }
 
 
-    pub fn matches(&self, path : &Vec<String>) -> bool {
+    pub fn matches(&self, path: &Vec<String>) -> bool {
         if path.len() <= self.components.len() {
             return false;
         }
@@ -114,15 +121,15 @@ impl Pattern {
             return false;
         }
 
-        if !self.file_mask.matches(&path[path.len() -1]) {
+        if !self.file_mask.matches(&path[path.len() - 1]) {
             return false;
         }
 
         for (i, comp) in self.components.iter().enumerate() {
             match &comp {
                 MatchType::Anything() => continue,
-                MatchType::ExactMatch(x) => if *x != path[i] { return false },
-                MatchType::WildcardMatch(x) => if !x.matches(&path[i]) { return false },
+                MatchType::ExactMatch(x) => if *x != path[i] { return false; },
+                MatchType::WildcardMatch(x) => if !x.matches(&path[i]) { return false; },
             }
         };
 
@@ -130,29 +137,26 @@ impl Pattern {
     }
 }
 
-fn convert_path_for_matching(path : &Path) -> Vec<String> {
+fn convert_path_for_matching(path: &Path) -> Vec<String> {
     path.to_path_buf().iter().map(|f| f.to_str().unwrap().to_string().to_lowercase()).filter(|f| f != "\\").collect()
 }
 
-fn iterate_fs(current_path : &Path, patterns : &Vec<Pattern>, output : &mut io::Write) {
-
+fn iterate_fs(current_path: &Path, patterns: &Vec<Pattern>, output: &mut dyn io::Write) {
     if let Ok(dirs) = fs::read_dir(current_path) {
         for dir in dirs {
             if let Ok(entry) = dir {
                 let path = entry.path();
-    
+
                 let converted_path = convert_path_for_matching(&path);
 
                 if path.is_dir() {
-
                     for pattern in patterns {
                         if pattern.parent_matches(&converted_path) {
                             iterate_fs(&path, patterns, output);
                             break;
                         }
                     }
-                }
-                else {
+                } else {
                     for pattern in patterns {
                         if pattern.matches(&converted_path) {
                             let display = path.display().to_string() + "\n";
@@ -161,14 +165,12 @@ fn iterate_fs(current_path : &Path, patterns : &Vec<Pattern>, output : &mut io::
                         }
                     }
                 }
-
             }
         }
     }
 }
 
 fn main() -> Result<(), io::Error> {
-
     let opts: Opts = Opts::parse();
 
     let mut output = match &opts.output {
@@ -182,12 +184,13 @@ fn main() -> Result<(), io::Error> {
     let mut patterns = Vec::<Pattern>::new();
     let mut drive_letters = Vec::<String>::new();
 
-    if let Ok(contents) =  fs::read_to_string(opts.input) {
+    if opts.input_tkape.is_some() {
+        let contents = fs::read_to_string(opts.input_tkape.unwrap()).expect("File not found");
 
-        let deserialized : Vec<TKapeEntry> = serde_json::from_str(&contents).unwrap_or_default();
+        let deserialized: Vec<TKapeEntry> = serde_json::from_str(&contents).unwrap_or_default();
 
         if deserialized.len() == 0 {
-            return Err(io::Error::new(io::ErrorKind::Other, "Eror reading JSON"));
+            panic!("Error reading JSON")
         }
 
         for config in deserialized {
@@ -196,7 +199,7 @@ fn main() -> Result<(), io::Error> {
 
                 for component in &pattern.components {
                     if let MatchType::ExactMatch(x) = &component {
-                        let drive_letter = x.clone().to_uppercase() + "\\";
+                        let drive_letter = x.to_uppercase() + "\\";
                         if !drive_letters.contains(&drive_letter) {
                             drive_letters.push(drive_letter);
                         }
@@ -204,16 +207,34 @@ fn main() -> Result<(), io::Error> {
                 }
 
                 patterns.push(pattern);
-
             }
         }
+    } else if opts.input_simple.is_some() {
+        for line in BufReader::new(File::open(opts.input_simple.unwrap())
+            .expect("Input file not found"))
+            .lines()
+            .filter_map(|it| it.ok()){
+            let pattern = Pattern::new("", &line, true);
+            extract_letters(&mut drive_letters, &pattern);
+            patterns.push(pattern);
+
+        }
     }
-    else {
-        return Err(io::Error::new(io::ErrorKind::NotFound, "File not found"));
-    }
+
 
     for drive_letter in drive_letters {
         iterate_fs(Path::new(&drive_letter), &patterns, &mut *output);
     }
     Ok(())
+}
+
+fn extract_letters(drive_letters: &mut Vec<String>, pattern: &Pattern) {
+    for component in &pattern.components {
+        if let MatchType::ExactMatch(x) = &component {
+            let drive_letter = x.to_uppercase() + "\\";
+            if !drive_letters.contains(&drive_letter) {
+                drive_letters.push(drive_letter);
+            }
+        }
+    }
 }

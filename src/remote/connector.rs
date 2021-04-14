@@ -14,19 +14,7 @@ use username::get_user_name;
 pub struct Computer {
     pub address: String,
     pub username: String,
-    pub domain: Option<String>,
     pub password: Option<String>,
-}
-
-impl Computer {
-    pub fn domain_username(&self) -> String {
-        match &self.domain {
-            None =>
-                self.username.clone(),
-            Some(domain) =>
-                format!("{}\\{}", domain, self.username),
-        }
-    }
 }
 
 pub struct Command<'a> {
@@ -39,24 +27,20 @@ pub struct Command<'a> {
 impl From<Opts> for Computer {
     fn from(opts: Opts) -> Self {
         let local_mode = opts.local || opts.computer == "127.0.0.1" || opts.computer == "localhost";
-        let (domain, username) = match &opts.user {
+        let username = match &opts.user {
             Some(user) => if user.is_empty() {
-                (None, "".to_string())
+                "".to_string()
             } else {
-                (opts.domain, user.clone())
+                user.clone()
             },
             None => {
                 if local_mode {
-                    (None, get_user_name().expect("Non unicode character in this username"))
+                    get_user_name().expect("Non unicode character in this username")
                 }else {
-                    println!("Domain (optional): ");
-                    let mut domain = String::new();
-                    let _ = io::stdin().read_line(&mut domain);
-
                     println!("Username: ");
                     let mut user = String::new();
                     io::stdin().read_line(&mut user).ok();
-                    (if domain.trim().is_empty() { None } else { Some(domain) }, user)
+                    user
                 }
             }
         };
@@ -78,7 +62,6 @@ impl From<Opts> for Computer {
         Computer {
             address: opts.computer,
             username,
-            domain,
             password,
         }
     }
@@ -99,43 +82,16 @@ impl Into<Vec<Computer>> for Opts {
                             .map(|item| item.to_string())
                             .collect::<Vec<String>>();
                         let address = splitted.get(0).cloned();
-                        let domain_username = splitted.get(1).cloned();
+                        let username = splitted.get(1).cloned();
                         let password = splitted.get(2).cloned();
                         address.map(|address| {
-                            let (domain_option, username_option) = match domain_username {
-                                None => (self.domain.clone(), self.user.clone()),
-                                Some(domain_username_unwrapped) => {
-                                    let splitted_du = domain_username_unwrapped
-                                        .split("\\")
-                                        .map(|item| item.to_string())
-                                        .collect::<Vec<String>>();
-                                    match splitted_du.len() {
-                                        0 => (self.domain.clone(), self.user.clone()),
-                                        1 => (self.domain.clone(), Some(splitted_du[0].clone())),
-                                        _ => (Some(splitted_du[0].clone()), Some(splitted_du[1].clone()))
-                                    }
-                                }
-                            };
-                            let (domain, username) = match username_option {
-                                Some(user) => if user.is_empty() {
-                                    (domain_option, "".to_string())
-                                } else {
-                                    (domain_option, user.clone())
-                                },
+                            let username = match username {
+                                Some(user) => user,
                                 None => {
-                                    let domain = match domain_option {
-                                        None => {
-                                            println!("Domain (optional): ");
-                                            let mut domain = String::new();
-                                            let _ = io::stdin().read_line(&mut domain);
-                                            if domain.trim().is_empty() { None } else { Some(domain) }
-                                        }
-                                        Some(domain) => Some(domain)
-                                    };
                                     println!("Username: ");
                                     let mut user = String::new();
                                     io::stdin().read_line(&mut user).ok();
-                                    (domain, user)
+                                    user
                                 }
                             };
                             let password = match password {
@@ -160,7 +116,6 @@ impl Into<Vec<Computer>> for Opts {
                             Computer {
                                 address: address.clone(),
                                 username,
-                                domain,
                                 password,
                             }
                         })
@@ -386,7 +341,7 @@ pub trait Connector {
                 "icacls.exe".to_string(),
                 path.to_string_lossy().to_string(),
                 "/grant".to_string(),
-                format!("{}:F", self.computer().domain_username())
+                format!("{}:F", self.computer().username)
             ],
             report_store_directory: None,
             report_filename_prefix: "GRANT_VSI",

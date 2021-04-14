@@ -53,7 +53,7 @@ impl Connector for PsRemote {
             "{".to_string(),
         ];
         prepared_command.extend(command);
-        let username = remote_computer.domain_username();
+        let username = remote_computer.username.clone();
         let credential = match &remote_computer.password {
             None => username,
             Some(password) =>

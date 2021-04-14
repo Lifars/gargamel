@@ -305,7 +305,7 @@ impl WindowsRemoteFileHandler {
             "USE".to_string(),
             format!("\\\\{}", self.computer.address),
         ];
-        let username = self.computer.domain_username();
+        let username = self.computer.username.clone();
         args.push(format!("/u:{}", username));
         if let Some(password) = &self.computer.password {
             args.push(password.clone());

@@ -41,7 +41,7 @@ impl Connector for Wmi {
             "-ComputerName".to_string(),
             remote_computer.address.clone(),
             "-RemoteUser".to_string(),
-            remote_computer.domain_username(),
+            remote_computer.username.clone(),
             "-CommandExec".to_string(),
             "-RemoteCommand".to_string(),
             format!("{}", command_joined),
@@ -83,7 +83,7 @@ impl Wmi {
             "-ComputerName".to_string(),
             remote_computer.address.clone(),
             "-RemoteUser".to_string(),
-            remote_computer.domain_username()
+            remote_computer.username.clone()
         ];
 
         if target_is_remote {
@@ -128,7 +128,7 @@ impl FileCopier for Wmi {
             "-ComputerName".to_string(),
             remote_computer.address.clone(),
             "-RemoteUser".to_string(),
-            remote_computer.domain_username()
+            remote_computer.username.clone()
         ];
 
         if let Some(password) = &remote_computer.password {

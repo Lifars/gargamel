@@ -73,7 +73,6 @@ fn main() -> Result<(), io::Error> {
     trace!("Will connect to {} computers", remote_computers.len());
     let opts = Opts {
         password: remote_computers[0].password.clone(),
-        domain: remote_computers[0].domain.clone(),
         user: Some(remote_computers[0].username.clone()),
         computer: remote_computers[0].address.clone(),
         ..opts
@@ -92,7 +91,7 @@ fn main() -> Result<(), io::Error> {
 }
 
 fn handle_remote_computer(opts: &Opts, remote_computer: &Computer) -> Result<(), io::Error> {
-    info!("Connecting to {} with user {}", remote_computer.address, remote_computer.domain_username());
+    info!("Connecting to {} with user {}", remote_computer.address, remote_computer.username);
     let local_store_directory_owned = dunce::canonicalize(Path::new(&opts.local_store_directory)).unwrap();
     let local_store_directory = local_store_directory_owned.as_path();
     let remote_temp_storage = Path::new(&opts.remote_store_directory);

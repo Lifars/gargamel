@@ -9,7 +9,7 @@ use crate::kape_handler;
 pub fn download_files(file_list: &str,
                       local_store_directory: &Path,
                       downloader: &dyn RemoteFileCopier,
-                      separate_stores: bool
+                      separate_stores: bool,
 ) -> io::Result<()> {
     if file_list == "EMBEDDED" {
         download_files_from_embedded(local_store_directory, downloader, separate_stores)
@@ -20,7 +20,7 @@ pub fn download_files(file_list: &str,
 
 pub fn download_files_from_embedded(local_store_directory: &Path,
                                     downloader: &dyn RemoteFileCopier,
-                                    separate_stores: bool
+                                    separate_stores: bool,
 ) -> io::Result<()> {
     let local_store_directory = dunce::canonicalize(local_store_directory)
         .expect(&format!("Cannot canonicalize {}", local_store_directory.display()));
@@ -36,7 +36,7 @@ pub fn download_files_from_embedded(local_store_directory: &Path,
 pub fn download_files_from_path(file_list: &Path,
                                 local_store_directory: &Path,
                                 downloader: &dyn RemoteFileCopier,
-                                separate_stores: bool
+                                separate_stores: bool,
 ) -> io::Result<()> {
     let input_file = File::open(file_list)?;
 
@@ -46,7 +46,7 @@ pub fn download_files_from_path(file_list: &Path,
     for path_to_find in BufReader::new(input_file).lines() {
         if path_to_find.is_err() {
             warn!("Cannot read line in {}", file_list.display());
-            continue
+            continue;
         }
 
         let path_to_find = path_to_find.unwrap();
@@ -58,17 +58,14 @@ pub fn download_files_from_path(file_list: &Path,
                             warn!("{}", e)
                         }
                     }
-                },
+                }
                 _ => println!("Error parsing {}", path_to_find)
             };
-
-
-        }else {
+        } else {
             if let Err(e) = download_file(&path_to_find, &local_store_directory, downloader, separate_stores) {
                 warn!("{}", e)
             }
         }
-
     }
     Ok(())
 }
@@ -94,9 +91,9 @@ pub fn download_file(
             .replace("?", "--Q--")
             .replace(":", "");
         let local_store_directory = local_store_directory.join(dir_name);
-        let _ =std::fs::create_dir(&local_store_directory);
+        let _ = std::fs::create_dir(&local_store_directory);
         local_store_directory
-    }else{
+    } else {
         local_store_directory.to_path_buf()
     };
 

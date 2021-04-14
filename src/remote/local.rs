@@ -15,7 +15,6 @@ impl Local {
                 address: String::from("127.0.0.1"),
                 username,
                 password: None,
-                domain: None,
             },
             temp_storage
         }

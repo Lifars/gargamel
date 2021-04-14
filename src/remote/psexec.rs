@@ -94,7 +94,7 @@ impl Connector for PsExec {
             program_name,
             address,
             "-u".to_string(),
-            remote_computer.domain_username(),
+            remote_computer.username.clone(),
         ];
         if let Some(password) = &remote_computer.password {
             prepared_command.push("-p".to_string());

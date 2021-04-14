@@ -81,12 +81,7 @@ impl Connector for Rdp {
             format!("computername={}", &remote_computer.address),
         ];
 
-        let username = match &remote_computer.domain {
-            None =>
-                remote_computer.username.clone(),
-            Some(domain) =>
-                format!("{}\\{}", domain, remote_computer.username),
-        };
+        let username = remote_computer.username.clone();
         prepared_command.push(format!("username={}", username));
         if let Some(password) = &remote_computer.password {
             prepared_command.push(format!("password={}", password));
@@ -133,7 +128,7 @@ impl Rdp {
             "takeover=true".to_string(),
             "connectdrive=true".to_string(),
         ];
-        let username = self.computer.domain_username();
+        let username = self.computer.username.clone();
         args.push(format!("username={}", username));
         if let Some(password) = &self.computer.password {
             args.push(format!("password={}", password));
