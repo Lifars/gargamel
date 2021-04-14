@@ -1,7 +1,7 @@
 extern crate rpassword;
 
 use std::io;
-use simplelog::{CombinedLogger, TermLogger, WriteLogger, Config, TerminalMode, LevelFilter};
+use simplelog::{CombinedLogger, TermLogger, WriteLogger, Config, TerminalMode, LevelFilter, ColorChoice};
 use std::fs::{File, create_dir_all};
 use crate::logo::print_logo;
 use crate::arg_parser::Opts;
@@ -42,21 +42,21 @@ mod kape_handler;
 mod svi_data_acquirer;
 mod embedded_search_list;
 
-fn setup_logger() {
+fn setup_logger(disable_log_colors: bool) {
     CombinedLogger::init(
         vec![
-            TermLogger::new(LevelFilter::Trace, Config::default(), TerminalMode::Mixed).unwrap(),
-            WriteLogger::new(LevelFilter::Trace, Config::default(), File::create("gargamel.log").unwrap()),
+            TermLogger::new(LevelFilter::Trace, Config::default(), TerminalMode::Mixed, if disable_log_colors { ColorChoice::Never } else { ColorChoice::Auto }),
+            WriteLogger::new(LevelFilter::Trace, Config::default(), File::create("gargamel.log").expect("Cannot create log file")),
         ]
     ).unwrap();
 }
 
 fn main() -> Result<(), io::Error> {
-    setup_logger();
+    let opts: Opts = Opts::parse();
+
+    setup_logger(opts.disable_log_colors);
     print_logo();
 
-    let opts: Opts = Opts::parse();
-    
     create_dir_all(&opts.local_store_directory)?;
     debug!("Parsing remote computers.");
 

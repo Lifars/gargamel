@@ -11,7 +11,7 @@ lto = true
 
 [dependencies]
 log = "0.4"
-simplelog = "0.7"
+simplelog = "0.10"
 clap = { git = "https://github.com/clap-rs/clap/" }
 bytes = ""
 uuid = { version = "0.8.2", features = ["v4"] }

@@ -47,11 +47,11 @@ pub fn download_files_from_path(file_list: &Path,
     for path_to_find in BufReader::new(input_file).lines() {
         if path_to_find.is_err() {
             warn!("Cannot read line in {}", file_list.display());
+            continue
         }
 
         let path_to_find = path_to_find.unwrap();
         if path_to_find.ends_with("tkape") {
-
             match kape_handler::parse_tkape(Path::new(&path_to_find)) {
                 Ok(tkape) => tkapes.push(tkape),
                 _ => println!("Error parsing {}", path_to_find)

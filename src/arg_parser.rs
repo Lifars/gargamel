@@ -215,5 +215,11 @@ pub struct Opts {
     #[clap(
     long = "reverse-share"
     )]
-    pub reverse_share: bool
+    pub reverse_share: bool,
+
+    /// Optional: Disable colored log messages.
+    #[clap(
+    long = "disable-log-colors"
+    )]
+    pub disable_log_colors: bool
 }
